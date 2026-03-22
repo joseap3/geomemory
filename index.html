@@ -1,0 +1,1616 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#0a0f1e">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="GeoMemory">
+<title>🌍 GeoMemory 2.0</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&display=swap');
+
+/* ══ THEME TOKENS ══ */
+[data-theme="dark"] {
+  --bg: #0a0f1e;
+  --bg2: #111827;
+  --surface: #1a2235;
+  --surface2: #243047;
+  --surface3: #2d3c56;
+  --border: rgba(255,255,255,0.08);
+  --border2: rgba(255,255,255,0.14);
+  --text: #e8eef8;
+  --text2: #94a3b8;
+  --text3: #64748b;
+  --accent: #4f9cf9;
+  --accent-glow: rgba(79,156,249,0.25);
+  --green: #34d399;
+  --red: #f87171;
+  --gold: #fbbf24;
+  --purple: #a78bfa;
+  --pink: #f472b6;
+  --map-filter: brightness(0.8) saturate(0.85) hue-rotate(200deg);
+  --shadow-lg: 0 20px 60px rgba(0,0,0,0.6);
+  --shadow-md: 0 8px 24px rgba(0,0,0,0.4);
+}
+
+[data-theme="light"] {
+  --bg: #f0f4ff;
+  --bg2: #e8eef8;
+  --surface: #ffffff;
+  --surface2: #f1f5fd;
+  --surface3: #e4eaf7;
+  --border: rgba(0,0,0,0.08);
+  --border2: rgba(0,0,0,0.14);
+  --text: #0f172a;
+  --text2: #475569;
+  --text3: #94a3b8;
+  --accent: #2563eb;
+  --accent-glow: rgba(37,99,235,0.15);
+  --green: #059669;
+  --red: #dc2626;
+  --gold: #d97706;
+  --purple: #7c3aed;
+  --pink: #db2777;
+  --map-filter: brightness(1) saturate(1);
+  --shadow-lg: 0 20px 60px rgba(0,0,0,0.15);
+  --shadow-md: 0 8px 24px rgba(0,0,0,0.1);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+html,body { width:100%;height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;color:var(--text);background:var(--bg); }
+
+/* ══ MAP ══ */
+#map { position:fixed;inset:0;z-index:0; }
+.leaflet-tile-pane { filter: var(--map-filter); transition: filter 0.5s; }
+.leaflet-control-zoom a { background:var(--surface)!important;color:var(--text)!important;border:1px solid var(--border2)!important;backdrop-filter:blur(12px); }
+.leaflet-control-attribution { background:rgba(10,15,30,0.7)!important;color:var(--text3)!important;font-size:9px!important; }
+
+/* ══ LOADING ══ */
+#loading {
+  position:fixed;inset:0;z-index:9999;
+  background:var(--bg);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;
+  transition:opacity 0.6s;
+}
+.load-logo { font-family:'Syne',sans-serif;font-size:36px;font-weight:800;letter-spacing:-1px; }
+.load-logo em { color:var(--accent);font-style:normal; }
+.load-sub { font-size:13px;color:var(--text3);letter-spacing:1px; }
+.load-ring {
+  width:56px;height:56px;border-radius:50%;
+  border:3px solid var(--border2);
+  border-top-color:var(--accent);
+  animation:spin 0.9s linear infinite;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ══ TOP BAR ══ */
+#topBar {
+  position:fixed;top:0;left:0;right:0;z-index:100;
+  height:56px;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 14px;
+  background:linear-gradient(180deg,rgba(10,15,30,0.95) 0%,transparent 100%);
+  pointer-events:none;
+}
+[data-theme="light"] #topBar { background:linear-gradient(180deg,rgba(240,244,255,0.95) 0%,transparent 100%); }
+.top-logo { font-family:'Syne',sans-serif;font-size:18px;font-weight:800; pointer-events:all; }
+.top-logo em { color:var(--accent);font-style:normal; }
+.top-actions { display:flex;gap:8px;pointer-events:all; }
+.icon-btn {
+  width:36px;height:36px;border-radius:50%;
+  background:var(--surface);border:1px solid var(--border2);
+  display:flex;align-items:center;justify-content:center;
+  font-size:16px;cursor:pointer;
+  backdrop-filter:blur(12px);
+  transition:transform 0.15s,background 0.15s;
+  box-shadow:var(--shadow-md);
+}
+.icon-btn:active{transform:scale(0.88);}
+
+/* ══ STATUS CHIP ══ */
+#statusChip {
+  position:fixed;top:64px;left:50%;transform:translateX(-50%);
+  background:var(--surface);border:1px solid var(--border2);
+  border-radius:20px;padding:5px 14px;
+  font-size:11px;color:var(--text2);letter-spacing:0.5px;
+  backdrop-filter:blur(12px);z-index:100;pointer-events:none;
+  display:flex;align-items:center;gap:6px;white-space:nowrap;
+  box-shadow:var(--shadow-md);transition:all 0.3s;
+}
+.sdot{width:6px;height:6px;border-radius:50%;background:var(--text3);transition:background 0.3s;}
+.sdot.on{background:var(--green);}
+.sdot.warn{background:var(--red);animation:blink 1s infinite;}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0.3}}
+
+/* ══ MINI RADAR ══ */
+#radar {
+  position:fixed;bottom:120px;right:14px;z-index:100;
+  width:90px;height:90px;border-radius:50%;
+  background:rgba(10,15,30,0.9);
+  border:1.5px solid var(--border2);
+  backdrop-filter:blur(12px);
+  overflow:hidden;display:none;
+  box-shadow:var(--shadow-md);
+}
+#radar.show{display:block;}
+#radarCanvas{width:90px;height:90px;}
+.radar-label{
+  position:absolute;bottom:4px;left:50%;transform:translateX(-50%);
+  font-size:8px;color:var(--text3);letter-spacing:1px;white-space:nowrap;
+}
+
+/* ══ FAB ZONE ══ */
+#fabZone {
+  position:fixed;bottom:0;left:0;right:0;z-index:100;
+  padding:10px 16px 28px;
+  display:flex;align-items:flex-end;justify-content:space-between;
+  pointer-events:none;
+}
+.fab-col{display:flex;flex-direction:column;gap:10px;align-items:center;}
+#fabMain {
+  width:62px;height:62px;border-radius:50%;
+  background:linear-gradient(135deg,var(--accent),#1d4ed8);
+  border:none;color:#fff;font-size:28px;
+  display:flex;align-items:center;justify-content:center;
+  box-shadow:0 4px 20px var(--accent-glow),0 0 0 4px rgba(79,156,249,0.15);
+  cursor:pointer;pointer-events:all;
+  transition:transform 0.15s,box-shadow 0.15s;
+}
+#fabMain:active{transform:scale(0.9);}
+.fab-mini {
+  width:46px;height:46px;border-radius:50%;
+  background:var(--surface);border:1px solid var(--border2);
+  display:flex;align-items:center;justify-content:center;
+  font-size:19px;cursor:pointer;pointer-events:all;
+  backdrop-filter:blur(12px);box-shadow:var(--shadow-md);
+  transition:transform 0.15s;position:relative;
+}
+.fab-mini:active{transform:scale(0.88);}
+.fab-badge {
+  position:absolute;top:-4px;right:-4px;
+  min-width:18px;height:18px;border-radius:9px;
+  background:var(--accent);color:#fff;
+  font-size:10px;font-weight:700;
+  display:flex;align-items:center;justify-content:center;
+  padding:0 4px;font-family:'Syne',sans-serif;
+}
+
+/* ══ PROXIMITY BANNER ══ */
+#proxBanner {
+  position:fixed;top:108px;left:12px;right:12px;z-index:101;
+  background:linear-gradient(135deg,rgba(52,211,153,0.18),rgba(52,211,153,0.06));
+  border:1px solid rgba(52,211,153,0.4);
+  border-radius:16px;padding:12px 16px;
+  display:none;align-items:center;gap:12px;
+  backdrop-filter:blur(12px);cursor:pointer;
+  animation:slideIn 0.4s cubic-bezier(0.34,1.56,0.64,1);
+  box-shadow:var(--shadow-md);
+}
+#proxBanner.show{display:flex;}
+@keyframes slideIn{from{transform:translateY(-16px);opacity:0}to{transform:translateY(0);opacity:1}}
+.prox-icon{font-size:28px;flex-shrink:0;}
+.prox-text{flex:1;}
+.prox-title{font-family:'Syne',sans-serif;font-size:14px;font-weight:700;color:var(--green);}
+.prox-sub{font-size:12px;color:var(--text2);}
+.prox-close{font-size:18px;color:var(--text3);padding:4px;}
+
+/* ══ AR OVERLAY ══ */
+#arOverlay {
+  position:fixed;inset:0;z-index:200;
+  display:none;flex-direction:column;
+  background:#000;
+}
+#arOverlay.show{display:flex;}
+#arVideo{width:100%;height:100%;object-fit:cover;position:absolute;}
+#arCanvas2{position:absolute;inset:0;width:100%;height:100%;}
+#arHUD{position:absolute;inset:0;pointer-events:none;}
+#arClose{
+  position:absolute;top:20px;right:16px;
+  width:44px;height:44px;border-radius:50%;
+  background:rgba(0,0,0,0.7);border:1px solid rgba(255,255,255,0.2);
+  color:#fff;font-size:20px;cursor:pointer;pointer-events:all;
+  display:flex;align-items:center;justify-content:center;
+}
+#arInfo{
+  position:absolute;bottom:40px;left:16px;right:16px;
+  background:rgba(0,0,0,0.8);border:1px solid rgba(255,255,255,0.15);
+  border-radius:16px;padding:14px 16px;color:#fff;
+  backdrop-filter:blur(12px);
+}
+.ar-title{font-family:'Syne',sans-serif;font-size:16px;font-weight:700;}
+.ar-dist{font-size:12px;color:rgba(255,255,255,0.6);margin-top:3px;}
+#arScanLine{
+  position:absolute;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,transparent,var(--accent),transparent);
+  animation:arScan 3s ease-in-out infinite;top:0;
+}
+@keyframes arScan{0%{top:0;opacity:1}100%{top:100%;opacity:0.3}}
+
+/* ══ OVERLAY + SHEET ══ */
+#overlay{position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:149;display:none;backdrop-filter:blur(3px);}
+#overlay.show{display:block;}
+
+.sheet {
+  position:fixed;left:0;right:0;bottom:0;
+  background:var(--surface);border-radius:24px 24px 0 0;
+  z-index:150;transform:translateY(100%);
+  transition:transform 0.38s cubic-bezier(0.32,0.72,0,1);
+  max-height:93dvh;display:flex;flex-direction:column;
+  box-shadow:0 -4px 40px rgba(0,0,0,0.5);
+}
+.sheet.open{transform:translateY(0);}
+.sh-handle{width:36px;height:4px;border-radius:2px;background:var(--border2);margin:12px auto 0;flex-shrink:0;}
+.sh-head{padding:14px 18px 10px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;border-bottom:1px solid var(--border);}
+.sh-title{font-family:'Syne',sans-serif;font-size:17px;font-weight:700;}
+.sh-close{width:30px;height:30px;border-radius:50%;background:var(--surface2);border:none;color:var(--text2);font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;}
+.sh-body{padding:14px 18px 32px;overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:14px;}
+
+/* ══ FORM ══ */
+.f-label{font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:5px;}
+.f-input,.f-textarea {
+  width:100%;background:var(--surface2);border:1.5px solid var(--border2);
+  border-radius:12px;padding:11px 14px;color:var(--text);
+  font-family:'DM Sans',sans-serif;font-size:15px;outline:none;
+  transition:border-color 0.2s;
+}
+.f-input:focus,.f-textarea:focus{border-color:var(--accent);}
+.f-textarea{min-height:80px;resize:none;}
+.f-group{display:flex;flex-direction:column;}
+
+/* ══ VISIBILITY TOGGLE ══ */
+.vis-row{display:flex;gap:8px;}
+.vis-btn{
+  flex:1;padding:10px 8px;border-radius:10px;
+  border:1.5px solid var(--border2);background:transparent;
+  color:var(--text2);font-size:12px;font-family:'DM Sans',sans-serif;
+  cursor:pointer;transition:all 0.15s;display:flex;align-items:center;justify-content:center;gap:5px;
+}
+.vis-btn.active{border-color:var(--accent);background:var(--accent-glow);color:var(--accent);}
+
+/* ══ CATEGORY CHIPS ══ */
+.cat-row{display:flex;gap:7px;flex-wrap:wrap;}
+.cat-chip{
+  padding:6px 12px;border-radius:20px;
+  border:1.5px solid var(--border2);background:transparent;
+  color:var(--text2);font-size:12px;cursor:pointer;
+  transition:all 0.15s;font-family:'DM Sans',sans-serif;
+}
+.cat-chip.sel{border-color:var(--accent);background:var(--accent-glow);color:var(--accent);}
+
+/* ══ PHOTO ══ */
+#photoPreview{width:100%;border-radius:12px;max-height:180px;object-fit:cover;display:none;border:1px solid var(--border);}
+.media-btn{
+  width:100%;padding:13px;border-radius:12px;
+  background:var(--surface2);border:1.5px dashed var(--border2);
+  color:var(--text2);font-family:'DM Sans',sans-serif;font-size:14px;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;
+  transition:border-color 0.2s,color 0.2s;
+}
+.media-btn:active{border-color:var(--accent);color:var(--accent);}
+
+/* ══ AUDIO RECORDER ══ */
+#audioRecorder{
+  background:var(--surface2);border-radius:12px;padding:12px 14px;
+  display:flex;align-items:center;gap:10px;
+}
+#recBtn{
+  width:42px;height:42px;border-radius:50%;border:none;
+  background:var(--red);color:#fff;font-size:18px;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;
+  transition:transform 0.15s,background 0.2s;flex-shrink:0;
+}
+#recBtn.recording{background:#ff4444;animation:recPulse 0.8s ease-in-out infinite;}
+@keyframes recPulse{0%,100%{box-shadow:0 0 0 0 rgba(255,68,68,0.5)}50%{box-shadow:0 0 0 10px rgba(255,68,68,0)}}
+#recStatus{flex:1;font-size:13px;color:var(--text2);}
+#recTime{font-family:'Syne',sans-serif;font-size:14px;font-weight:700;color:var(--red);}
+#audioPlayback{width:100%;border-radius:8px;margin-top:6px;display:none;}
+
+/* ══ BUTTONS ══ */
+.btn-primary{
+  width:100%;padding:15px;border-radius:12px;
+  background:linear-gradient(135deg,var(--accent),#1d4ed8);
+  border:none;color:#fff;font-family:'Syne',sans-serif;
+  font-size:15px;font-weight:700;cursor:pointer;
+  box-shadow:0 4px 16px var(--accent-glow);
+  transition:transform 0.1s;
+}
+.btn-primary:active{transform:scale(0.98);}
+.btn-primary:disabled{opacity:0.5;pointer-events:none;}
+.btn-row{display:flex;gap:8px;}
+.btn-sec{
+  flex:1;padding:11px 8px;border-radius:10px;
+  background:var(--surface2);border:1px solid var(--border2);
+  color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;
+  transition:background 0.15s;
+}
+.btn-sec:active{background:var(--surface3);}
+.btn-danger{background:rgba(248,113,113,0.1);border-color:rgba(248,113,113,0.3);color:var(--red);}
+
+/* ══ MEMORY CARD ══ */
+.mcard{
+  background:var(--surface2);border-radius:14px;
+  border:1px solid var(--border);overflow:hidden;
+  cursor:pointer;transition:transform 0.15s,border-color 0.15s;
+}
+.mcard:active{transform:scale(0.98);border-color:var(--accent);}
+.mcard-img{width:100%;height:120px;object-fit:cover;display:block;}
+.mcard-body{padding:10px 12px;}
+.mcard-title{font-family:'Syne',sans-serif;font-size:14px;font-weight:700;margin-bottom:4px;}
+.mcard-meta{font-size:11px;color:var(--text2);display:flex;align-items:center;gap:7px;flex-wrap:wrap;}
+.cbadge{padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600;}
+.priv-badge{padding:2px 8px;border-radius:10px;font-size:10px;background:rgba(251,191,36,0.15);color:var(--gold);}
+
+/* ══ DETAIL ══ */
+#detailImg{width:100%;border-radius:12px;max-height:220px;object-fit:cover;display:none;}
+.detail-text{
+  font-size:14px;line-height:1.75;color:var(--text);
+  background:var(--surface2);border-radius:10px;padding:12px 14px;
+  white-space:pre-wrap;
+}
+.coords-row{
+  font-size:11px;color:var(--text2);background:var(--surface2);
+  border-radius:8px;padding:8px 12px;
+  display:flex;justify-content:space-between;align-items:center;
+}
+
+/* ══ QR ══ */
+#qrWrap{
+  background:#fff;border-radius:14px;padding:16px;
+  display:flex;flex-direction:column;align-items:center;gap:8px;
+}
+#qrDiv{display:flex;justify-content:center;}
+.qr-lbl{font-size:11px;color:#888;text-align:center;}
+
+/* ══ STATS ══ */
+.stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.stat-card{
+  background:var(--surface2);border-radius:14px;
+  padding:14px;border:1px solid var(--border);
+}
+.stat-val{font-family:'Syne',sans-serif;font-size:28px;font-weight:800;}
+.stat-lbl{font-size:11px;color:var(--text3);margin-top:2px;letter-spacing:0.5px;}
+.heatmap-note{font-size:12px;color:var(--text3);text-align:center;padding:12px;background:var(--surface2);border-radius:10px;}
+
+/* ══ TRAIL ══ */
+.trail-item{
+  background:var(--surface2);border-radius:12px;padding:10px 12px;
+  border:1px solid var(--border);display:flex;align-items:center;gap:10px;
+  cursor:pointer;transition:border-color 0.15s;
+}
+.trail-item:active{border-color:var(--accent);}
+.trail-dot{
+  width:10px;height:10px;border-radius:50%;
+  background:var(--accent);flex-shrink:0;
+}
+
+/* ══ LOGIN ══ */
+#loginScreen{
+  position:fixed;inset:0;z-index:500;
+  background:var(--bg);
+  flex-direction:column;align-items:center;justify-content:center;
+  gap:24px;padding:32px;text-align:center;
+}
+.login-globe{font-size:72px;animation:float 3s ease-in-out infinite;}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-12px)}}
+.login-title{font-family:'Syne',sans-serif;font-size:32px;font-weight:800;letter-spacing:-1px;}
+.login-title em{color:var(--accent);font-style:normal;}
+.login-sub{font-size:14px;color:var(--text2);line-height:1.7;max-width:300px;}
+.login-card{
+  width:100%;max-width:340px;background:var(--surface);
+  border-radius:20px;padding:24px;border:1px solid var(--border2);
+  display:flex;flex-direction:column;gap:12px;
+  box-shadow:var(--shadow-lg);
+}
+.btn-google{
+  width:100%;padding:14px;border-radius:12px;
+  background:var(--surface2);border:1.5px solid var(--border2);
+  color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;font-weight:500;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;
+  transition:background 0.15s,border-color 0.15s;
+}
+.btn-google:active{background:var(--surface3);}
+.btn-anon{
+  width:100%;padding:14px;border-radius:12px;
+  background:linear-gradient(135deg,var(--accent),#1d4ed8);
+  border:none;color:#fff;font-family:'Syne',sans-serif;
+  font-size:14px;font-weight:700;cursor:pointer;
+  box-shadow:0 4px 16px var(--accent-glow);
+}
+.login-sep{font-size:12px;color:var(--text3);text-align:center;}
+
+/* ══ USER AVATAR ══ */
+.user-chip{
+  display:flex;align-items:center;gap:8px;pointer-events:all;
+  cursor:pointer;
+}
+.u-avatar{
+  width:32px;height:32px;border-radius:50%;
+  background:linear-gradient(135deg,var(--accent),var(--purple));
+  display:flex;align-items:center;justify-content:center;
+  font-size:14px;font-weight:700;font-family:'Syne',sans-serif;color:#fff;
+  border:2px solid rgba(255,255,255,0.2);
+}
+
+/* ══ TOAST ══ */
+#toast{
+  position:fixed;bottom:108px;left:50%;transform:translateX(-50%);
+  background:var(--surface);border:1px solid var(--border2);
+  border-radius:20px;padding:9px 18px;font-size:13px;color:var(--text);
+  backdrop-filter:blur(12px);z-index:400;
+  opacity:0;transition:opacity 0.25s;pointer-events:none;
+  white-space:nowrap;box-shadow:var(--shadow-md);max-width:90vw;text-align:center;
+}
+#toast.show{opacity:1;}
+
+/* ══ SEGMENT TABS ══ */
+.seg-tabs{display:flex;background:var(--surface2);border-radius:10px;padding:3px;gap:2px;}
+.seg-tab{
+  flex:1;padding:7px;border-radius:8px;border:none;
+  background:transparent;color:var(--text2);font-size:12px;
+  font-family:'DM Sans',sans-serif;cursor:pointer;transition:all 0.15s;
+}
+.seg-tab.active{background:var(--surface3);color:var(--text);font-weight:600;}
+
+/* ══ EMPTY ══ */
+.empty{text-align:center;padding:32px 20px;color:var(--text3);}
+.empty .ei{font-size:40px;margin-bottom:10px;}
+.empty p{font-size:13px;line-height:1.7;}
+
+/* ══ TRAIL MODE ══ */
+#trailBtn.active{background:rgba(167,139,250,0.2)!important;border-color:var(--purple)!important;color:var(--purple)!important;}
+</style>
+</head>
+<body>
+
+<!-- LOADING -->
+<div id="loading">
+  <div style="font-size:56px">🌍</div>
+  <div class="load-logo">Geo<em>Memory</em></div>
+  <div class="load-ring"></div>
+  <div class="load-sub">Carregando mapa...</div>
+</div>
+
+<!-- LOGIN -->
+<div id="loginScreen" style="display:none">
+  <div class="login-globe">🌍</div>
+  <div class="login-title">Geo<em>Memory</em><br><span style="font-size:18px;font-weight:400;color:var(--text2)">2.0</span></div>
+  <div class="login-sub">Deixe memórias digitais em qualquer lugar do mundo. Texto, fotos, áudio e muito mais.</div>
+  <div class="login-card">
+    <button class="btn-google" onclick="loginGoogle()">
+      <span>🔵</span> Entrar com Google
+    </button>
+    <div class="login-sep">— ou —</div>
+    <button class="btn-anon" onclick="loginAnon()">🚀 Entrar como visitante</button>
+    <div style="font-size:11px;color:var(--text3);text-align:center">Visitante: dados ficam neste dispositivo</div>
+  </div>
+</div>
+
+<!-- MAP -->
+<div id="map"></div>
+
+<!-- AR OVERLAY -->
+<div id="arOverlay">
+  <video id="arVideo" autoplay playsinline muted></video>
+  <canvas id="arCanvas2"></canvas>
+  <div id="arHUD">
+    <div id="arScanLine"></div>
+    <!-- crosshair -->
+    <svg style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%)" width="80" height="80" viewBox="0 0 80 80">
+      <circle cx="40" cy="40" r="30" stroke="rgba(79,156,249,0.5)" stroke-width="1" fill="none"/>
+      <line x1="40" y1="10" x2="40" y2="25" stroke="#4f9cf9" stroke-width="1.5"/>
+      <line x1="40" y1="55" x2="40" y2="70" stroke="#4f9cf9" stroke-width="1.5"/>
+      <line x1="10" y1="40" x2="25" y2="40" stroke="#4f9cf9" stroke-width="1.5"/>
+      <line x1="55" y1="40" x2="70" y2="40" stroke="#4f9cf9" stroke-width="1.5"/>
+    </svg>
+  </div>
+  <button id="arClose" onclick="closeAR()">✕</button>
+  <div id="arInfo" style="display:none">
+    <div class="ar-title" id="arTitle"></div>
+    <div class="ar-dist" id="arDist"></div>
+  </div>
+</div>
+
+<!-- TOP BAR -->
+<div id="topBar">
+  <div class="top-logo">Geo<em>Memory</em></div>
+  <div class="top-actions">
+    <div class="icon-btn" onclick="toggleTheme()" title="Tema">🌙</div>
+    <div class="user-chip" onclick="openSheet('profileSheet')">
+      <div class="u-avatar" id="uAvatar">?</div>
+    </div>
+  </div>
+</div>
+
+<!-- STATUS -->
+<div id="statusChip">
+  <div class="sdot" id="sdot"></div>
+  <span id="statusTxt">Iniciando...</span>
+</div>
+
+<!-- PROXIMITY BANNER -->
+<div id="proxBanner" onclick="onProxTap()">
+  <div class="prox-icon">📍</div>
+  <div class="prox-text">
+    <div class="prox-title" id="proxTitle">Memória próxima!</div>
+    <div class="prox-sub" id="proxSub">Toque para ver</div>
+  </div>
+  <div class="prox-close" onclick="event.stopPropagation();hideProx()">✕</div>
+</div>
+
+<!-- MINI RADAR -->
+<div id="radar">
+  <canvas id="radarCanvas" width="90" height="90"></canvas>
+  <div class="radar-label">RADAR</div>
+</div>
+
+<!-- FAB ZONE -->
+<div id="fabZone">
+  <div class="fab-col">
+    <div class="fab-mini" onclick="openSheet('listSheet')" id="listFab">
+      📋
+      <div class="fab-badge" id="memCount">0</div>
+    </div>
+    <div class="fab-mini" onclick="centerOnMe()">🎯</div>
+  </div>
+  <div id="fabMain" onclick="startAddMemory()">＋</div>
+  <div class="fab-col">
+    <div class="fab-mini" onclick="toggleTrailMode()" id="trailBtn" title="Modo trilha">🗺️</div>
+    <div class="fab-mini" onclick="openSheet('statsSheet')">📊</div>
+  </div>
+</div>
+
+<!-- OVERLAY -->
+<div id="overlay" onclick="closeAllSheets()"></div>
+<div id="toast"></div>
+
+<!-- ════════════════════════════════════════
+     SHEET: ADD / EDIT MEMORY
+════════════════════════════════════════ -->
+<div class="sheet" id="addSheet">
+  <div class="sh-handle"></div>
+  <div class="sh-head">
+    <div class="sh-title" id="addSheetTitle">📍 Nova Memória</div>
+    <button class="sh-close" onclick="closeAllSheets()">✕</button>
+  </div>
+  <div class="sh-body">
+    <input type="hidden" id="editId">
+    <div class="f-group">
+      <div class="f-label">Título</div>
+      <input class="f-input" id="fTitle" placeholder="Nome deste lugar..." maxlength="60">
+    </div>
+    <div class="f-group">
+      <div class="f-label">Visibilidade</div>
+      <div class="vis-row">
+        <button class="vis-btn active" data-vis="public" onclick="selectVis(this)">🌍 Pública</button>
+        <button class="vis-btn" data-vis="private" onclick="selectVis(this)">🔒 Privada</button>
+        <button class="vis-btn" data-vis="friends" onclick="selectVis(this)">👥 Amigos</button>
+      </div>
+    </div>
+    <div class="f-group">
+      <div class="f-label">Categoria</div>
+      <div class="cat-row" id="catRow">
+        <div class="cat-chip sel" data-cat="📸 Foto" onclick="selCat(this)">📸 Foto</div>
+        <div class="cat-chip" data-cat="💬 Mensagem" onclick="selCat(this)">💬 Mensagem</div>
+        <div class="cat-chip" data-cat="⚠️ Alerta" onclick="selCat(this)">⚠️ Alerta</div>
+        <div class="cat-chip" data-cat="🎨 Arte" onclick="selCat(this)">🎨 Arte</div>
+        <div class="cat-chip" data-cat="🕐 Cápsula" onclick="selCat(this)">🕐 Cápsula</div>
+        <div class="cat-chip" data-cat="❤️ Amor" onclick="selCat(this)">❤️ Amor</div>
+        <div class="cat-chip" data-cat="🚨 SOS" onclick="selCat(this)">🚨 SOS</div>
+      </div>
+    </div>
+    <div class="f-group">
+      <div class="f-label">Mensagem</div>
+      <textarea class="f-textarea" id="fText" placeholder="Escreva sua memória, aviso ou mensagem..."></textarea>
+    </div>
+    <div class="f-group">
+      <div class="f-label">Foto</div>
+      <img id="photoPreview" alt="preview"/>
+      <label class="media-btn" for="photoInput">📷 Câmera ou galeria</label>
+      <input type="file" id="photoInput" accept="image/*" capture="environment" style="display:none" onchange="onPhoto(this)">
+    </div>
+    <div class="f-group">
+      <div class="f-label">Áudio / Voz</div>
+      <div id="audioRecorder">
+        <button id="recBtn" onclick="toggleRecord()">🎙️</button>
+        <div style="flex:1">
+          <div id="recStatus">Toque para gravar</div>
+          <div id="recTime" style="display:none">00:00</div>
+        </div>
+      </div>
+      <audio id="audioPlayback" controls></audio>
+    </div>
+    <div class="f-group">
+      <div class="f-label">Localização</div>
+      <div style="font-size:12px;color:var(--text2);background:var(--surface2);border-radius:10px;padding:10px 12px;line-height:1.6">
+        <div id="fCoords">📍 Posição atual</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:3px">Ou toque no mapa antes de abrir</div>
+      </div>
+    </div>
+    <button class="btn-primary" id="saveBtn" onclick="saveMemory()">💾 Salvar Memória</button>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════
+     SHEET: LIST
+════════════════════════════════════════ -->
+<div class="sheet" id="listSheet">
+  <div class="sh-handle"></div>
+  <div class="sh-head">
+    <div class="sh-title">🗂️ Memórias</div>
+    <button class="sh-close" onclick="closeAllSheets()">✕</button>
+  </div>
+  <div class="sh-body">
+    <input class="f-input" id="searchInput" placeholder="🔍  Buscar por título, categoria..." oninput="renderList()">
+    <div class="seg-tabs">
+      <button class="seg-tab active" data-filter="all" onclick="setFilter(this)">Todas</button>
+      <button class="seg-tab" data-filter="public" onclick="setFilter(this)">🌍 Públicas</button>
+      <button class="seg-tab" data-filter="private" onclick="setFilter(this)">🔒 Privadas</button>
+    </div>
+    <div id="listBody"></div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════
+     SHEET: DETAIL
+════════════════════════════════════════ -->
+<div class="sheet" id="detailSheet">
+  <div class="sh-handle"></div>
+  <div class="sh-head">
+    <div class="sh-title" id="dtTitle">Memória</div>
+    <button class="sh-close" onclick="closeAllSheets()">✕</button>
+  </div>
+  <div class="sh-body">
+    <img id="detailImg" alt="foto"/>
+    <div id="dtCatBadge" style="display:flex;gap:6px;align-items:center"></div>
+    <div class="f-group">
+      <div class="f-label">Mensagem</div>
+      <div class="detail-text" id="dtText"></div>
+    </div>
+    <div id="dtAudioWrap" class="f-group" style="display:none">
+      <div class="f-label">Áudio</div>
+      <audio id="dtAudio" controls style="width:100%;border-radius:8px;"></audio>
+    </div>
+    <div class="f-group">
+      <div class="f-label">Localização</div>
+      <div class="coords-row">
+        <span id="dtCoords" style="font-size:11px;font-family:monospace"></span>
+        <span id="dtDist" style="color:var(--green);font-size:12px;font-weight:600"></span>
+      </div>
+    </div>
+    <div class="f-group">
+      <div class="f-label">QR Code</div>
+      <div id="qrWrap"><div id="qrDiv"></div><div class="qr-lbl" id="qrLbl"></div></div>
+    </div>
+    <div class="f-group">
+      <div class="f-label">Data</div>
+      <div style="font-size:13px;color:var(--text2)" id="dtDate"></div>
+    </div>
+    <div class="btn-row">
+      <button class="btn-sec" onclick="navToMemory()">🗺️ Navegar</button>
+      <button class="btn-sec" onclick="shareMemory()">🔗 Partilhar</button>
+      <button class="btn-sec" onclick="openARMode()">📷 AR</button>
+    </div>
+    <div class="btn-row">
+      <button class="btn-sec" onclick="editMemory()">✏️ Editar</button>
+      <button class="btn-sec btn-danger" onclick="deleteMemory()">🗑️ Apagar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════
+     SHEET: STATS
+════════════════════════════════════════ -->
+<div class="sheet" id="statsSheet">
+  <div class="sh-handle"></div>
+  <div class="sh-head">
+    <div class="sh-title">📊 Estatísticas</div>
+    <button class="sh-close" onclick="closeAllSheets()">✕</button>
+  </div>
+  <div class="sh-body" id="statsBody"></div>
+</div>
+
+<!-- ════════════════════════════════════════
+     SHEET: PROFILE
+════════════════════════════════════════ -->
+<div class="sheet" id="profileSheet">
+  <div class="sh-handle"></div>
+  <div class="sh-head">
+    <div class="sh-title">👤 Perfil</div>
+    <button class="sh-close" onclick="closeAllSheets()">✕</button>
+  </div>
+  <div class="sh-body" id="profileBody"></div>
+</div>
+
+<script>
+'use strict';
+// ══════════════════════════════════════════════════
+//  CONSTANTS & STATE
+// ══════════════════════════════════════════════════
+const STORAGE_KEY  = 'gm2_memories';
+const USER_KEY     = 'gm2_user';
+const PROX_RADIUS  = 80; // meters
+const CAT_COLORS   = {
+  '📸 Foto':'#4f9cf9','💬 Mensagem':'#34d399','⚠️ Alerta':'#f87171',
+  '🎨 Arte':'#a78bfa','🕐 Cápsula':'#fbbf24','❤️ Amor':'#f472b6','🚨 SOS':'#ff3b30'
+};
+
+let map, userMarker, accCircle;
+let memories = [], markerMap = {};
+let userPos = null, currentUser = null;
+let selectedCat = '📸 Foto', selectedVis = 'public';
+let pendingLatLng = null, currentDetailId = null, nearbyId = null;
+let photoData = null, audioData = null, audioBlob = null;
+let mediaRecorder = null, recInterval = null, recSecs = 0;
+let trailMode = false, trailPoints = [], trailPolyline = null;
+let arStream = null;
+let listFilter = 'all';
+let radarTimer = null;
+let isDark = true;
+
+// ══════════════════════════════════════════════════
+//  BOOT
+// ══════════════════════════════════════════════════
+window.addEventListener('load', () => {
+  loadData();
+  const saved = localStorage.getItem('gm2_theme') || 'dark';
+  setTheme(saved);
+
+  // Always hide loading after max 3s regardless
+  setTimeout(forceHideLoading, 3000);
+
+  const u = localStorage.getItem(USER_KEY);
+  if (u) {
+    try { currentUser = JSON.parse(u); } catch { currentUser = null; }
+  }
+
+  if (currentUser) {
+    document.getElementById('loginScreen').style.display = 'none';
+    showApp();
+  } else {
+    forceHideLoading();
+    document.getElementById('loginScreen').style.display = 'flex';
+  }
+
+  checkURLParam();
+});
+
+function forceHideLoading() {
+  const l = document.getElementById('loading');
+  if (l) { l.style.opacity='0'; setTimeout(()=>{ l.style.display='none'; },400); }
+}
+
+function showApp() {
+  document.getElementById('loginScreen').style.display = 'none';
+  updateAvatar();
+  initMap();
+  startGPS();
+  updateCount();
+  forceHideLoading();
+}
+
+// ══════════════════════════════════════════════════
+//  AUTH (simulated — replace with Firebase)
+// ══════════════════════════════════════════════════
+function loginGoogle() {
+  // Simulated Google login — in production use Firebase Auth
+  const name = prompt('Simulação Google Login\nDigite seu nome:', 'Usuário');
+  if (!name) return;
+  currentUser = { id: 'g_' + Date.now(), name, type: 'google', avatar: name[0].toUpperCase() };
+  localStorage.setItem(USER_KEY, JSON.stringify(currentUser));
+  showApp();
+  showToast('👋 Bem-vindo, ' + name + '!');
+}
+
+function loginAnon() {
+  currentUser = { id: 'anon_' + Date.now(), name: 'Visitante', type: 'anon', avatar: '👤' };
+  localStorage.setItem(USER_KEY, JSON.stringify(currentUser));
+  showApp();
+  showToast('🚀 Entrando como visitante');
+}
+
+function updateAvatar() {
+  if (!currentUser) return;
+  const el = document.getElementById('uAvatar');
+  el.textContent = currentUser.avatar || currentUser.name?.[0] || '?';
+}
+
+function openProfileSheet() {
+  const b = document.getElementById('profileBody');
+  b.innerHTML = `
+    <div style="text-align:center;padding:16px 0 8px">
+      <div style="width:64px;height:64px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--purple));display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:700;margin:0 auto 12px;font-family:'Syne',sans-serif;color:#fff">${currentUser?.avatar||'?'}</div>
+      <div style="font-family:'Syne',sans-serif;font-size:18px;font-weight:700">${currentUser?.name||'Usuário'}</div>
+      <div style="font-size:12px;color:var(--text3);margin-top:3px">${currentUser?.type==='google'?'Google Account':'Visitante'}</div>
+    </div>
+    <div style="background:var(--surface2);border-radius:12px;padding:12px 14px">
+      <div style="font-size:13px;color:var(--text2)">${memories.length} memórias criadas</div>
+    </div>
+    <button class="btn-sec" onclick="exportMemories()">📤 Exportar dados (JSON)</button>
+    <label class="btn-sec" for="importFile" style="cursor:pointer">📥 Importar dados</label>
+    <input type="file" id="importFile" accept=".json" style="display:none" onchange="importMemories(this)">
+    <button class="btn-sec btn-danger" onclick="logoutUser()">🚪 Sair</button>
+  `;
+  openSheet('profileSheet');
+}
+
+function logoutUser() {
+  if (!confirm('Sair da conta? Dados locais permanecem.')) return;
+  localStorage.removeItem(USER_KEY);
+  currentUser = null;
+  closeAllSheets();
+  document.getElementById('loginScreen').style.display = 'flex';
+}
+
+// ══════════════════════════════════════════════════
+//  MAP
+// ══════════════════════════════════════════════════
+function initMap() {
+  map = L.map('map', { zoomControl: true }).setView([-15.78, -47.93], 14);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap', maxZoom: 19
+  }).addTo(map);
+
+  map.on('click', e => {
+    if (trailMode) { addTrailPoint(e.latlng); return; }
+    pendingLatLng = e.latlng;
+    document.getElementById('fCoords').textContent =
+      `📍 ${e.latlng.lat.toFixed(6)}, ${e.latlng.lng.toFixed(6)}`;
+    startAddMemory();
+  });
+
+  renderAllMarkers();
+  document.getElementById('radar').classList.add('show');
+  startRadar();
+}
+
+function startGPS() {
+  if (!navigator.geolocation) {
+    setStatus('GPS não suportado', 'warn');
+    showGPSBanner('Este navegador não suporta GPS.');
+    hideLoading();
+    return;
+  }
+
+  // Check if we're on HTTP (not HTTPS) — GPS blocked on most mobile browsers
+  if (location.protocol === 'http:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
+    setStatus('HTTPS necessário para GPS', 'warn');
+    showGPSBanner('⚠️ GPS requer HTTPS. Abra via HTTPS ou use o botão abaixo para localização manual.');
+    hideLoading();
+    return;
+  }
+
+  setStatus('Solicitando permissão...', 'warn');
+
+  // Use Permissions API first if available (shows why it failed)
+  if (navigator.permissions) {
+    navigator.permissions.query({ name: 'geolocation' }).then(result => {
+      if (result.state === 'denied') {
+        setStatus('GPS bloqueado — ative nas configurações', 'warn');
+        showGPSBanner('📍 GPS bloqueado. Vá em Configurações do navegador → Permissões → Localização → Permitir para este site.');
+        hideLoading();
+        return;
+      }
+      doGetPosition();
+    }).catch(() => doGetPosition());
+  } else {
+    doGetPosition();
+  }
+}
+
+function doGetPosition() {
+  setStatus('Aguardando GPS...', 'warn');
+
+  navigator.geolocation.getCurrentPosition(
+    p => {
+      onPos(p);
+      hideLoading();
+      // After first fix, start watching
+      navigator.geolocation.watchPosition(
+        onPos,
+        onGPSError,
+        { enableHighAccuracy: true, maximumAge: 3000, timeout: 15000 }
+      );
+    },
+    onGPSError,
+    { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 }
+  );
+}
+
+function onGPSError(err) {
+  hideLoading();
+  let msg = '';
+  switch(err.code) {
+    case 1: // PERMISSION_DENIED
+      msg = '📍 Permissão negada. Vá em Configurações → Privacidade → Localização → Permitir para o navegador.';
+      setStatus('Permissão negada', 'warn');
+      break;
+    case 2: // POSITION_UNAVAILABLE
+      msg = '📡 Localização indisponível. Verifique se o GPS do celular está ativado em Configurações.';
+      setStatus('GPS indisponível', 'warn');
+      break;
+    case 3: // TIMEOUT
+      msg = '⏱️ GPS demorou demais. Tente ao ar livre ou toque no mapa para definir posição manualmente.';
+      setStatus('GPS timeout', 'warn');
+      break;
+    default:
+      msg = '⚠️ Erro ao obter localização. Toque no mapa para definir sua posição.';
+      setStatus('Erro de GPS', 'warn');
+  }
+  showGPSBanner(msg);
+  if (!userPos) map.setView([-15.78, -47.93], 13);
+}
+
+function showGPSBanner(msg) {
+  let banner = document.getElementById('gpsBanner');
+  if (!banner) {
+    banner = document.createElement('div');
+    banner.id = 'gpsBanner';
+    banner.style.cssText = `
+      position:fixed;bottom:110px;left:12px;right:12px;z-index:200;
+      background:var(--surface);border:1.5px solid rgba(251,191,36,0.5);
+      border-radius:16px;padding:14px 16px;
+      font-size:13px;line-height:1.6;color:var(--text);
+      backdrop-filter:blur(12px);box-shadow:0 8px 24px rgba(0,0,0,0.4);
+    `;
+    document.body.appendChild(banner);
+  }
+  banner.innerHTML = `
+    <div style="font-family:'Syne',sans-serif;font-weight:700;color:var(--gold);margin-bottom:6px">⚠️ Localização</div>
+    <div>${msg}</div>
+    <div style="display:flex;gap:8px;margin-top:10px">
+      <button onclick="doGetPosition();document.getElementById('gpsBanner').remove()" style="flex:1;padding:9px;border-radius:9px;background:var(--accent);border:none;color:#fff;font-family:'Syne',sans-serif;font-size:13px;font-weight:700;cursor:pointer">🔄 Tentar novamente</button>
+      <button onclick="document.getElementById('gpsBanner').remove()" style="padding:9px 14px;border-radius:9px;background:var(--surface2);border:1px solid var(--border2);color:var(--text2);font-size:13px;cursor:pointer">✕</button>
+    </div>
+  `;
+}
+
+function onPos(p) {
+  const lat = p.coords.latitude, lng = p.coords.longitude, acc = Math.round(p.coords.accuracy);
+  userPos = { lat, lng };
+
+  // Remove GPS banner if showing
+  const b = document.getElementById('gpsBanner');
+  if (b) b.remove();
+
+  const accLabel = acc < 10 ? `GPS preciso ±${acc}m` : acc < 50 ? `GPS ±${acc}m` : `GPS impreciso ±${acc}m`;
+  setStatus(accLabel, 'on');
+
+  if (!userMarker) {
+    userMarker = L.circleMarker([lat,lng], {
+      radius:10, fillColor:'#4f9cf9', color:'#fff', weight:3, fillOpacity:0.95
+    }).addTo(map).bindPopup('📍 Você está aqui');
+    accCircle = L.circle([lat,lng], {
+      radius: acc, color:'#4f9cf9', fillOpacity:0.06, weight:1
+    }).addTo(map);
+    map.setView([lat,lng], 17);
+  } else {
+    userMarker.setLatLng([lat,lng]);
+    if (accCircle) accCircle.setLatLng([lat,lng]).setRadius(acc);
+  }
+
+  document.getElementById('fCoords').textContent = `📍 ${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+  checkProximity();
+  drawRadar();
+}
+
+function centerOnMe() {
+  if (userPos) {
+    map.flyTo([userPos.lat, userPos.lng], 18, { duration: 1 });
+  } else {
+    showToast('GPS não disponível — toque no mapa');
+    doGetPosition();
+  }
+}
+
+function hideLoading() { forceHideLoading(); }
+
+// ══════════════════════════════════════════════════
+//  MARKERS
+// ══════════════════════════════════════════════════
+function renderAllMarkers() {
+  memories.forEach(m => addMarkerToMap(m));
+}
+
+function addMarkerToMap(m) {
+  const color = CAT_COLORS[m.cat] || '#4f9cf9';
+  const emoji = m.cat?.split(' ')[0] || '📍';
+  const lockIcon = m.visibility === 'private' ? '<span style="position:absolute;bottom:-2px;right:-2px;font-size:9px">🔒</span>' : '';
+  const html = `<div style="position:relative;width:36px;height:36px;background:${color};border-radius:50% 50% 50% 0;transform:rotate(-45deg);display:flex;align-items:center;justify-content:center;border:2.5px solid rgba(255,255,255,0.6);box-shadow:0 4px 14px ${color}88"><span style="transform:rotate(45deg);font-size:16px">${emoji}</span>${lockIcon}</div>`;
+  const icon = L.divIcon({ className:'', html, iconSize:[36,36], iconAnchor:[18,36], popupAnchor:[0,-38] });
+  if (markerMap[m.id]) { map.removeLayer(markerMap[m.id]); }
+  const mk = L.marker([m.lat,m.lng],{icon}).addTo(map).on('click',()=>openDetail(m.id));
+  markerMap[m.id] = mk;
+}
+
+// ══════════════════════════════════════════════════
+//  ADD / EDIT MEMORY
+// ══════════════════════════════════════════════════
+function startAddMemory() {
+  document.getElementById('addSheetTitle').textContent = '📍 Nova Memória';
+  document.getElementById('editId').value = '';
+  document.getElementById('fTitle').value = '';
+  document.getElementById('fText').value = '';
+  document.getElementById('photoPreview').style.display = 'none';
+  document.getElementById('photoPreview').src = '';
+  document.getElementById('photoInput').value = '';
+  document.getElementById('audioPlayback').style.display = 'none';
+  document.getElementById('audioPlayback').src = '';
+  document.getElementById('recStatus').textContent = 'Toque para gravar';
+  photoData = null; audioData = null; audioBlob = null;
+  selectedCat = '📸 Foto'; selectedVis = 'public';
+  document.querySelectorAll('.cat-chip').forEach((c,i)=>c.classList.toggle('sel',i===0));
+  document.querySelectorAll('.vis-btn').forEach((b,i)=>b.classList.toggle('active',i===0));
+  openSheet('addSheet');
+}
+
+function editMemory() {
+  const m = memories.find(x=>x.id===currentDetailId);
+  if (!m) return;
+  closeAllSheets(true);
+  document.getElementById('addSheetTitle').textContent = '✏️ Editar Memória';
+  document.getElementById('editId').value = m.id;
+  document.getElementById('fTitle').value = m.title;
+  document.getElementById('fText').value = m.text || '';
+  selectedCat = m.cat; selectedVis = m.visibility || 'public';
+  document.querySelectorAll('.cat-chip').forEach(c=>c.classList.toggle('sel',c.dataset.cat===m.cat));
+  document.querySelectorAll('.vis-btn').forEach(b=>b.classList.toggle('active',b.dataset.vis===selectedVis));
+  if (m.photo) { document.getElementById('photoPreview').src=m.photo; document.getElementById('photoPreview').style.display='block'; photoData=m.photo; }
+  if (m.audio) { document.getElementById('audioPlayback').src=m.audio; document.getElementById('audioPlayback').style.display='block'; audioData=m.audio; }
+  pendingLatLng = { lat: m.lat, lng: m.lng };
+  document.getElementById('fCoords').textContent = `📍 ${m.lat.toFixed(6)}, ${m.lng.toFixed(6)}`;
+  openSheet('addSheet');
+}
+
+function selCat(el) {
+  document.querySelectorAll('.cat-chip').forEach(c=>c.classList.remove('sel'));
+  el.classList.add('sel'); selectedCat = el.dataset.cat;
+}
+
+function selectVis(el) {
+  document.querySelectorAll('.vis-btn').forEach(b=>b.classList.remove('active'));
+  el.classList.add('active'); selectedVis = el.dataset.vis;
+}
+
+function onPhoto(input) {
+  const file = input.files[0]; if (!file) return;
+  // Compress image
+  const img = new Image();
+  const url = URL.createObjectURL(file);
+  img.onload = () => {
+    const canvas = document.createElement('canvas');
+    const MAX = 800;
+    let w = img.width, h = img.height;
+    if (w > MAX) { h = h*MAX/w; w = MAX; }
+    if (h > MAX) { w = w*MAX/h; h = MAX; }
+    canvas.width = w; canvas.height = h;
+    canvas.getContext('2d').drawImage(img,0,0,w,h);
+    photoData = canvas.toDataURL('image/jpeg', 0.8);
+    const prev = document.getElementById('photoPreview');
+    prev.src = photoData; prev.style.display = 'block';
+    URL.revokeObjectURL(url);
+  };
+  img.src = url;
+}
+
+// ══════════════════════════════════════════════════
+//  AUDIO RECORDER
+// ══════════════════════════════════════════════════
+async function toggleRecord() {
+  if (mediaRecorder && mediaRecorder.state === 'recording') {
+    stopRecord(); return;
+  }
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const chunks = [];
+    mediaRecorder = new MediaRecorder(stream);
+    mediaRecorder.ondataavailable = e => chunks.push(e.data);
+    mediaRecorder.onstop = () => {
+      audioBlob = new Blob(chunks, { type: 'audio/webm' });
+      const reader = new FileReader();
+      reader.onload = e => {
+        audioData = e.target.result;
+        document.getElementById('audioPlayback').src = audioData;
+        document.getElementById('audioPlayback').style.display = 'block';
+      };
+      reader.readAsDataURL(audioBlob);
+      stream.getTracks().forEach(t=>t.stop());
+    };
+    mediaRecorder.start();
+    recSecs = 0;
+    document.getElementById('recBtn').textContent = '⏹️';
+    document.getElementById('recBtn').classList.add('recording');
+    document.getElementById('recStatus').style.display = 'none';
+    document.getElementById('recTime').style.display = 'block';
+    recInterval = setInterval(() => {
+      recSecs++;
+      const m = String(Math.floor(recSecs/60)).padStart(2,'0');
+      const s = String(recSecs%60).padStart(2,'0');
+      document.getElementById('recTime').textContent = `${m}:${s}`;
+      if (recSecs >= 120) stopRecord();
+    }, 1000);
+  } catch { showToast('⚠️ Permissão de microfone negada'); }
+}
+
+function stopRecord() {
+  if (mediaRecorder) { mediaRecorder.stop(); mediaRecorder = null; }
+  clearInterval(recInterval);
+  document.getElementById('recBtn').textContent = '🎙️';
+  document.getElementById('recBtn').classList.remove('recording');
+  document.getElementById('recStatus').style.display = 'block';
+  document.getElementById('recStatus').textContent = '✅ Áudio gravado';
+  document.getElementById('recTime').style.display = 'none';
+}
+
+// ══════════════════════════════════════════════════
+//  SAVE
+// ══════════════════════════════════════════════════
+function saveMemory() {
+  const title = document.getElementById('fTitle').value.trim();
+  const text  = document.getElementById('fText').value.trim();
+  const editId = document.getElementById('editId').value;
+  if (!title) { showToast('⚠️ Digite um título'); return; }
+  const latlng = pendingLatLng || userPos;
+  if (!latlng) { showToast('⚠️ Localização não disponível'); return; }
+  const btn = document.getElementById('saveBtn');
+  btn.disabled = true; btn.textContent = 'Salvando...';
+
+  const isEdit = !!editId;
+  const mem = {
+    id: editId || Date.now().toString(),
+    title, text,
+    cat: selectedCat,
+    visibility: selectedVis,
+    lat: latlng.lat ?? latlng.latitude,
+    lng: latlng.lng ?? latlng.longitude,
+    photo: photoData,
+    audio: audioData,
+    date: isEdit ? (memories.find(m=>m.id===editId)?.date || new Date().toISOString()) : new Date().toISOString(),
+    editedAt: isEdit ? new Date().toISOString() : null,
+    author: currentUser?.name || 'Anônimo',
+    authorId: currentUser?.id,
+  };
+
+  if (isEdit) { memories = memories.map(m=>m.id===editId?mem:m); }
+  else memories.push(mem);
+
+  saveData();
+  addMarkerToMap(mem);
+  closeAllSheets();
+  resetAddForm();
+  showToast(isEdit ? '✅ Memória editada!' : '✅ Memória salva!');
+  map.flyTo([mem.lat,mem.lng],17,{duration:1});
+  btn.disabled = false; btn.textContent = '💾 Salvar Memória';
+}
+
+function resetAddForm() {
+  pendingLatLng = null; photoData = null; audioData = null;
+  if (mediaRecorder) stopRecord();
+}
+
+// ══════════════════════════════════════════════════
+//  DETAIL
+// ══════════════════════════════════════════════════
+function openDetail(id) {
+  const m = memories.find(x=>x.id===id); if (!m) return;
+  currentDetailId = id;
+
+  document.getElementById('dtTitle').textContent = m.title;
+  document.getElementById('dtText').textContent = m.text || '(sem texto)';
+  document.getElementById('dtDate').textContent =
+    new Date(m.date).toLocaleString('pt-BR') + (m.editedAt ? ' (editado)' : '');
+
+  const img = document.getElementById('detailImg');
+  img.style.display = m.photo ? 'block' : 'none';
+  if (m.photo) img.src = m.photo;
+
+  const aw = document.getElementById('dtAudioWrap');
+  aw.style.display = m.audio ? 'block' : 'none';
+  if (m.audio) document.getElementById('dtAudio').src = m.audio;
+
+  const color = CAT_COLORS[m.cat]||'#4f9cf9';
+  const visIcon = m.visibility==='private'?'🔒':m.visibility==='friends'?'👥':'🌍';
+  document.getElementById('dtCatBadge').innerHTML =
+    `<span class="cbadge" style="background:${color}22;color:${color}">${m.cat}</span>
+     <span class="priv-badge">${visIcon} ${m.visibility||'pública'}</span>`;
+
+  document.getElementById('dtCoords').textContent = `${m.lat.toFixed(6)}, ${m.lng.toFixed(6)}`;
+
+  if (userPos) {
+    const d = haversine(userPos.lat,userPos.lng,m.lat,m.lng);
+    document.getElementById('dtDist').textContent = d<1000?`${Math.round(d)}m`:`${(d/1000).toFixed(1)}km`;
+  }
+
+  // QR
+  const qd = document.getElementById('qrDiv'); qd.innerHTML='';
+  const url = `${location.href.split('?')[0]}?m=${m.id}&lat=${m.lat}&lng=${m.lng}`;
+  try {
+    new QRCode(qd,{text:url,width:150,height:150,colorDark:'#0a0f1e',colorLight:'#ffffff',correctLevel:QRCode.CorrectLevel.M});
+  } catch(e){}
+  document.getElementById('qrLbl').textContent = `ID: ${m.id.slice(-8)}`;
+
+  closeAllSheets(true);
+  openSheet('detailSheet');
+}
+
+function deleteMemory() {
+  if (!confirm('Apagar esta memória?')) return;
+  memories = memories.filter(m=>m.id!==currentDetailId);
+  saveData();
+  if (markerMap[currentDetailId]) { map.removeLayer(markerMap[currentDetailId]); delete markerMap[currentDetailId]; }
+  closeAllSheets(); showToast('🗑️ Apagada');
+}
+
+function navToMemory() {
+  const m = memories.find(x=>x.id===currentDetailId); if (!m) return;
+  window.open(`https://www.google.com/maps/dir/?api=1&destination=${m.lat},${m.lng}`,'_blank');
+}
+
+function shareMemory() {
+  const m = memories.find(x=>x.id===currentDetailId); if (!m) return;
+  const url = `${location.href.split('?')[0]}?m=${m.id}&lat=${m.lat}&lng=${m.lng}`;
+  if (navigator.share) navigator.share({title:m.title,text:m.text||'',url});
+  else navigator.clipboard.writeText(url).then(()=>showToast('🔗 Link copiado!'));
+}
+
+// ══════════════════════════════════════════════════
+//  AR MODE
+// ══════════════════════════════════════════════════
+async function openARMode() {
+  const m = memories.find(x=>x.id===currentDetailId); if (!m) return;
+  try {
+    arStream = await navigator.mediaDevices.getUserMedia({
+      video:{facingMode:{ideal:'environment'},width:{ideal:1280},height:{ideal:720}},
+      audio:false
+    });
+    document.getElementById('arVideo').srcObject = arStream;
+    document.getElementById('arOverlay').classList.add('show');
+    document.getElementById('arTitle').textContent = m.title;
+    const d = userPos ? haversine(userPos.lat,userPos.lng,m.lat,m.lng) : 0;
+    document.getElementById('arDist').textContent = d ? `${Math.round(d)} metros de distância` : '';
+    document.getElementById('arInfo').style.display = 'block';
+    closeAllSheets();
+  } catch { showToast('⚠️ Câmera não disponível'); }
+}
+
+function closeAR() {
+  if (arStream) { arStream.getTracks().forEach(t=>t.stop()); arStream = null; }
+  document.getElementById('arOverlay').classList.remove('show');
+  document.getElementById('arVideo').srcObject = null;
+}
+
+// ══════════════════════════════════════════════════
+//  LIST
+// ══════════════════════════════════════════════════
+function renderList() {
+  const q = document.getElementById('searchInput').value.toLowerCase();
+  let list = memories;
+  if (listFilter==='public') list = list.filter(m=>m.visibility==='public'||!m.visibility);
+  if (listFilter==='private') list = list.filter(m=>m.visibility==='private');
+  if (q) list = list.filter(m=>m.title.toLowerCase().includes(q)||(m.text||'').toLowerCase().includes(q)||m.cat.toLowerCase().includes(q));
+  list = [...list].sort((a,b)=>new Date(b.date)-new Date(a.date));
+  const body = document.getElementById('listBody');
+  if (!list.length) { body.innerHTML=`<div class="empty"><div class="ei">🗺️</div><p>Nenhuma memória encontrada.</p></div>`; return; }
+  body.innerHTML = list.map(m=>{
+    const color = CAT_COLORS[m.cat]||'#4f9cf9';
+    const d = userPos ? haversine(userPos.lat,userPos.lng,m.lat,m.lng) : null;
+    const dist = d!=null ? (d<1000?`${Math.round(d)}m`:`${(d/1000).toFixed(1)}km`) : '';
+    const lock = m.visibility==='private'?'<span class="priv-badge">🔒</span>':'';
+    return `<div class="mcard" onclick="flyAndOpen('${m.id}')">
+      ${m.photo?`<img class="mcard-img" src="${m.photo}" alt="${m.title}" loading="lazy">`:''}
+      <div class="mcard-body">
+        <div class="mcard-title">${m.title}</div>
+        <div class="mcard-meta">
+          <span class="cbadge" style="background:${color}22;color:${color}">${m.cat}</span>
+          ${lock}
+          ${dist?`<span>📍 ${dist}</span>`:''}
+          <span>${new Date(m.date).toLocaleDateString('pt-BR')}</span>
+          ${m.audio?'<span>🎵</span>':''}
+        </div>
+      </div></div>`;
+  }).join('');
+}
+
+function setFilter(btn) {
+  document.querySelectorAll('.seg-tab').forEach(t=>t.classList.remove('active'));
+  btn.classList.add('active'); listFilter = btn.dataset.filter; renderList();
+}
+
+function flyAndOpen(id) {
+  const m = memories.find(x=>x.id===id); if (!m) return;
+  closeAllSheets();
+  map.flyTo([m.lat,m.lng],17,{duration:0.8});
+  setTimeout(()=>openDetail(id),900);
+}
+
+// ══════════════════════════════════════════════════
+//  STATS
+// ══════════════════════════════════════════════════
+function openStatsSheet() {
+  const total = memories.length;
+  const pub = memories.filter(m=>!m.visibility||m.visibility==='public').length;
+  const priv = memories.filter(m=>m.visibility==='private').length;
+  const withPhoto = memories.filter(m=>m.photo).length;
+  const withAudio = memories.filter(m=>m.audio).length;
+
+  const catCounts = {};
+  memories.forEach(m=>{ catCounts[m.cat]=(catCounts[m.cat]||0)+1; });
+  const topCat = Object.entries(catCounts).sort((a,b)=>b[1]-a[1])[0];
+
+  // Total distance traveled (sum of distances between consecutive GPS saves — approx)
+  const body = document.getElementById('statsBody');
+  body.innerHTML = `
+    <div class="stats-grid">
+      <div class="stat-card"><div class="stat-val" style="color:var(--accent)">${total}</div><div class="stat-lbl">Total de Memórias</div></div>
+      <div class="stat-card"><div class="stat-val" style="color:var(--green)">${pub}</div><div class="stat-lbl">Públicas</div></div>
+      <div class="stat-card"><div class="stat-val" style="color:var(--gold)">${priv}</div><div class="stat-lbl">Privadas</div></div>
+      <div class="stat-card"><div class="stat-val" style="color:var(--pink)">${withPhoto}</div><div class="stat-lbl">Com Foto</div></div>
+      <div class="stat-card"><div class="stat-val" style="color:var(--purple)">${withAudio}</div><div class="stat-lbl">Com Áudio</div></div>
+      <div class="stat-card"><div class="stat-val" style="color:var(--accent2||'#34d399')">${topCat?topCat[0].split(' ')[0]:'—'}</div><div class="stat-lbl">Categoria Top</div></div>
+    </div>
+    <div class="f-label" style="margin-top:4px">Por categoria</div>
+    ${Object.entries(catCounts).map(([cat,n])=>{
+      const color = CAT_COLORS[cat]||'#4f9cf9';
+      const pct = Math.round(n/total*100);
+      return `<div style="display:flex;align-items:center;gap:10px;font-size:13px">
+        <span>${cat}</span>
+        <div style="flex:1;height:6px;background:var(--surface2);border-radius:3px;overflow:hidden">
+          <div style="height:100%;width:${pct}%;background:${color};border-radius:3px;transition:width 0.6s"></div>
+        </div>
+        <span style="color:var(--text3);min-width:24px;text-align:right">${n}</span>
+      </div>`;
+    }).join('')}
+    <div class="heatmap-note">🗺️ Heatmap: as ${total} memórias estão distribuídas no mapa. Zoom out para ver a densidade visual.</div>
+  `;
+  openSheet('statsSheet');
+}
+
+// ══════════════════════════════════════════════════
+//  TRAIL MODE
+// ══════════════════════════════════════════════════
+function toggleTrailMode() {
+  trailMode = !trailMode;
+  const btn = document.getElementById('trailBtn');
+  btn.classList.toggle('active', trailMode);
+  if (trailMode) {
+    trailPoints = [];
+    if (trailPolyline) { map.removeLayer(trailPolyline); trailPolyline = null; }
+    showToast('🗺️ Modo trilha ON — toque no mapa para adicionar pontos');
+  } else {
+    showToast('🗺️ Modo trilha OFF');
+    if (trailPoints.length > 1) saveTrail();
+  }
+}
+
+function addTrailPoint(latlng) {
+  trailPoints.push(latlng);
+  if (trailPolyline) { map.removeLayer(trailPolyline); }
+  trailPolyline = L.polyline(trailPoints, { color: '#a78bfa', weight: 4, opacity: 0.8, dashArray: '8,6' }).addTo(map);
+  L.circleMarker(latlng,{radius:6,fillColor:'#a78bfa',color:'#fff',weight:2,fillOpacity:1}).addTo(map);
+  showToast(`📍 Ponto ${trailPoints.length} adicionado`);
+}
+
+function saveTrail() {
+  const name = prompt('Nome da trilha:', 'Minha Trilha');
+  if (!name) return;
+  const trail = { id: Date.now().toString(), name, points: trailPoints.map(p=>({lat:p.lat,lng:p.lng})), date: new Date().toISOString() };
+  const trails = JSON.parse(localStorage.getItem('gm2_trails')||'[]');
+  trails.push(trail);
+  localStorage.setItem('gm2_trails', JSON.stringify(trails));
+  showToast(`✅ Trilha "${name}" salva!`);
+}
+
+// ══════════════════════════════════════════════════
+//  PROXIMITY
+// ══════════════════════════════════════════════════
+function checkProximity() {
+  if (!userPos||!memories.length) return;
+  let closest=null, minD=Infinity;
+  memories.forEach(m=>{ const d=haversine(userPos.lat,userPos.lng,m.lat,m.lng); if(d<minD){minD=d;closest=m;} });
+  if (closest && minD<=PROX_RADIUS) {
+    nearbyId = closest.id;
+    document.getElementById('proxTitle').textContent = `"${closest.title}"`;
+    document.getElementById('proxSub').textContent = `${Math.round(minD)}m — toque para ver`;
+    const banner = document.getElementById('proxBanner');
+    banner.classList.add('show');
+    setTimeout(()=>banner.classList.remove('show'), 9000);
+  }
+}
+
+function onProxTap() { hideProx(); if (nearbyId) openDetail(nearbyId); }
+function hideProx() { document.getElementById('proxBanner').classList.remove('show'); }
+
+// ══════════════════════════════════════════════════
+//  MINI RADAR
+// ══════════════════════════════════════════════════
+function startRadar() { radarTimer = setInterval(drawRadar, 2000); drawRadar(); }
+
+function drawRadar() {
+  const canvas = document.getElementById('radarCanvas');
+  const ctx = canvas.getContext('2d');
+  const W = 90, H = 90, cx = 45, cy = 45, r = 38;
+  ctx.clearRect(0,0,W,H);
+
+  // Background
+  ctx.fillStyle = 'rgba(10,15,30,0.0)'; ctx.fillRect(0,0,W,H);
+
+  // Rings
+  [r*0.33, r*0.66, r].forEach(rr => {
+    ctx.beginPath(); ctx.arc(cx,cy,rr,0,Math.PI*2);
+    ctx.strokeStyle='rgba(79,156,249,0.2)'; ctx.lineWidth=1; ctx.stroke();
+  });
+
+  // Crosshairs
+  ctx.strokeStyle='rgba(79,156,249,0.15)'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(cx-r,cy); ctx.lineTo(cx+r,cy); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(cx,cy-r); ctx.lineTo(cx,cy+r); ctx.stroke();
+
+  // Sweep
+  const angle = (Date.now()/2000)*Math.PI*2;
+  const grad = ctx.createConicalGradient ? null : null;
+  ctx.save();
+  ctx.translate(cx,cy);
+  ctx.rotate(angle % (Math.PI*2));
+  const g = ctx.createLinearGradient(0,-r,0,0);
+  g.addColorStop(0,'rgba(79,156,249,0)');
+  g.addColorStop(1,'rgba(79,156,249,0.4)');
+  ctx.beginPath();
+  ctx.moveTo(0,0);
+  ctx.arc(0,0,r,-Math.PI/2,-Math.PI/2+Math.PI*0.4);
+  ctx.fillStyle=g; ctx.fill();
+  ctx.restore();
+
+  // Blips (memories)
+  if (userPos && memories.length) {
+    memories.forEach(m=>{
+      const dlat = m.lat - userPos.lat, dlng = m.lng - userPos.lng;
+      const dist = haversine(userPos.lat,userPos.lng,m.lat,m.lng);
+      if (dist > 500) return;
+      const scale = (dist/500) * r;
+      const bx = cx + (dlng/Math.abs(dlng+0.000001)) * Math.min(scale*Math.cos(Math.atan2(dlat,dlng)), r*0.9);
+      const by = cy - (dlat/Math.abs(dlat+0.000001)) * Math.min(scale*Math.sin(Math.atan2(dlat,dlng)), r*0.9);
+      // Proper bearing
+      const bearing = Math.atan2(dlng, dlat);
+      const bx2 = cx + Math.sin(bearing) * scale * 0.9;
+      const by2 = cy - Math.cos(bearing) * scale * 0.9;
+      const color = CAT_COLORS[m.cat]||'#4f9cf9';
+      ctx.beginPath(); ctx.arc(bx2,by2,3.5,0,Math.PI*2);
+      ctx.fillStyle=color; ctx.fill();
+      ctx.beginPath(); ctx.arc(bx2,by2,5,0,Math.PI*2);
+      ctx.strokeStyle=color+'88'; ctx.lineWidth=1; ctx.stroke();
+    });
+  }
+
+  // Center dot (user)
+  ctx.beginPath(); ctx.arc(cx,cy,4,0,Math.PI*2);
+  ctx.fillStyle='#4f9cf9'; ctx.fill();
+  ctx.beginPath(); ctx.arc(cx,cy,6,0,Math.PI*2);
+  ctx.strokeStyle='rgba(79,156,249,0.5)'; ctx.lineWidth=1.5; ctx.stroke();
+}
+
+// ══════════════════════════════════════════════════
+//  THEME
+// ══════════════════════════════════════════════════
+function toggleTheme() {
+  isDark = !isDark;
+  setTheme(isDark ? 'dark' : 'light');
+}
+
+function setTheme(theme) {
+  isDark = theme === 'dark';
+  document.documentElement.setAttribute('data-theme', theme);
+  localStorage.setItem('gm2_theme', theme);
+  document.querySelector('[onclick="toggleTheme()"]').textContent = isDark ? '🌙' : '☀️';
+  document.querySelector('meta[name="theme-color"]').content = isDark ? '#0a0f1e' : '#f0f4ff';
+}
+
+// ══════════════════════════════════════════════════
+//  EXPORT / IMPORT
+// ══════════════════════════════════════════════════
+function exportMemories() {
+  const data = JSON.stringify({ version:2, memories, exported: new Date().toISOString() }, null, 2);
+  const blob = new Blob([data], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href=url; a.download='geomemory_backup.json'; a.click();
+  URL.revokeObjectURL(url); showToast('📤 Exportado!');
+}
+
+function importMemories(input) {
+  const file = input.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const data = JSON.parse(e.target.result);
+      const imported = data.memories || data;
+      if (!Array.isArray(imported)) throw new Error();
+      const existing = new Set(memories.map(m=>m.id));
+      const newOnes = imported.filter(m=>!existing.has(m.id));
+      memories.push(...newOnes);
+      saveData(); newOnes.forEach(m=>addMarkerToMap(m));
+      showToast(`✅ ${newOnes.length} memórias importadas!`);
+      closeAllSheets();
+    } catch { showToast('⚠️ Arquivo inválido'); }
+  };
+  reader.readAsText(file);
+}
+
+// ══════════════════════════════════════════════════
+//  URL DEEP LINK
+// ══════════════════════════════════════════════════
+function checkURLParam() {
+  const p = new URLSearchParams(location.search);
+  const id=p.get('m'), lat=parseFloat(p.get('lat')), lng=parseFloat(p.get('lng'));
+  if (id && !isNaN(lat) && !isNaN(lng)) {
+    setTimeout(()=>{
+      if (map) map.setView([lat,lng],17);
+      const m = memories.find(x=>x.id===id);
+      if (m) setTimeout(()=>openDetail(id),1200);
+      else showToast('📍 Memória não encontrada');
+    }, 1500);
+  }
+}
+
+// ══════════════════════════════════════════════════
+//  STORAGE
+// ══════════════════════════════════════════════════
+function loadData() {
+  try { memories = JSON.parse(localStorage.getItem(STORAGE_KEY)||'[]'); } catch { memories=[]; }
+}
+function saveData() { localStorage.setItem(STORAGE_KEY,JSON.stringify(memories)); updateCount(); }
+function updateCount() {
+  document.getElementById('memCount').textContent = memories.length;
+  document.getElementById('listFab').querySelector('.fab-badge').textContent = memories.length;
+}
+
+// ══════════════════════════════════════════════════
+//  UTILS
+// ══════════════════════════════════════════════════
+function haversine(lat1,lng1,lat2,lng2) {
+  const R=6371000, dL=(lat2-lat1)*Math.PI/180, dl=(lng2-lng1)*Math.PI/180;
+  const a=Math.sin(dL/2)**2+Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dl/2)**2;
+  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+}
+
+function setStatus(txt,state) {
+  document.getElementById('statusTxt').textContent = txt;
+  const d=document.getElementById('sdot');
+  d.className='sdot'+(state==='on'?' on':state==='warn'?' warn':'');
+}
+
+function openSheet(id) {
+  closeAllSheets(true);
+  document.getElementById(id).classList.add('open');
+  document.getElementById('overlay').classList.add('show');
+  if (id==='listSheet') renderList();
+  if (id==='statsSheet') openStatsSheet();
+  if (id==='profileSheet') openProfileSheet();
+}
+
+function closeAllSheets(keepOv) {
+  document.querySelectorAll('.sheet').forEach(s=>s.classList.remove('open'));
+  if (!keepOv) document.getElementById('overlay').classList.remove('show');
+}
+
+function showToast(msg, dur=2500) {
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),dur);
+}
+
+// Swipe down to close
+document.querySelectorAll('.sheet').forEach(s=>{
+  let sy=0;
+  s.addEventListener('touchstart',e=>{sy=e.touches[0].clientY;},{passive:true});
+  s.addEventListener('touchend',e=>{if(e.changedTouches[0].clientY-sy>90)closeAllSheets();},{passive:true});
+});
+
+// Radar animation loop
+setInterval(()=>{ if(document.getElementById('radar').classList.contains('show')) drawRadar(); },50);
+</script>
+</body>
+</html>
