@@ -7,12 +7,49 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="GeoMemory">
-<meta name="description" content="Deixe memórias digitais em qualquer lugar do mundo">
-<link rel="manifest" id="manifestLink">
-<title>🌍 GeoMemory 3.0</title>
+<title>🌍 GeoMemory 4.0</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+<!-- ══════════════════════════════════════════
+  🔥 FIREBASE — SUBSTITUA AQUI SUAS CREDENCIAIS
+  Pegue em: console.firebase.google.com
+  ⚙️ Configurações > Seus apps > Web > firebaseConfig
+════════════════════════════════════════════ -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-app.js";
+import { getAuth, signInWithPopup, signInAnonymously, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
+import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, query, where, onSnapshot, orderBy, serverTimestamp, getDoc, getDocs, arrayUnion } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js";
+
+// ┌─────────────────────────────────────────────┐
+// │  COLE SUAS CREDENCIAIS FIREBASE AQUI ABAIXO │
+// └─────────────────────────────────────────────┘
+const firebaseConfig = {
+  apiKey:            "AIzaSyAcRPiMGTetouW1yYgxtcGtNN_WsoN9mTw",
+  authDomain:        "geomemory-a0b1f.firebaseapp.com",
+  projectId:         "geomemory-a0b1f",
+  storageBucket:     "geomemory-a0b1f.firebasestorage.app",
+  messagingSenderId: "88731634294",
+  appId:             "1:88731634294:web:babe29cb2ba19162312d57"
+};
+// ┌─────────────────────────────────────────────┐
+// │  FIM DAS CREDENCIAIS                        │
+// └─────────────────────────────────────────────┘
+
+const app  = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db   = getFirestore(app);
+const provider = new GoogleAuthProvider();
+
+// ── Expõe para o código global ──
+window._fb = { auth, db, provider, signInWithPopup, signInAnonymously, signOut, GoogleAuthProvider,
+  onAuthStateChanged, collection, addDoc, updateDoc, deleteDoc, doc, query, where, onSnapshot,
+  orderBy, serverTimestamp, getDoc, getDocs, arrayUnion };
+
+window.dispatchEvent(new Event('firebase-ready'));
+</script>
+
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap');
 
@@ -22,8 +59,7 @@
   --text:#e8eef8;--text2:#94a3b8;--text3:#4a5568;
   --accent:#4f9cf9;--accent2:#3b82f6;--aglow:rgba(79,156,249,0.25);
   --green:#34d399;--red:#f87171;--gold:#fbbf24;--purple:#a78bfa;--pink:#f472b6;--orange:#fb923c;
-  --map-filter:brightness(0.82) saturate(0.88) hue-rotate(195deg);
-  --sh:0 8px 32px rgba(0,0,0,0.5);--sh2:0 20px 60px rgba(0,0,0,0.65);
+  --sh:0 8px 28px rgba(0,0,0,.5);--sh2:0 20px 60px rgba(0,0,0,.65);
 }
 [data-theme="light"]{
   --bg:#f0f4ff;--surface:#fff;--surface2:#f1f5fd;--surface3:#e4eaf7;
@@ -31,46 +67,49 @@
   --text:#0f172a;--text2:#475569;--text3:#94a3b8;
   --accent:#2563eb;--accent2:#1d4ed8;--aglow:rgba(37,99,235,0.18);
   --green:#059669;--red:#dc2626;--gold:#d97706;--purple:#7c3aed;--pink:#db2777;--orange:#ea580c;
-  --map-filter:brightness(1) saturate(1);
-  --sh:0 8px 24px rgba(0,0,0,0.1);--sh2:0 20px 50px rgba(0,0,0,0.15);
+  --sh:0 8px 24px rgba(0,0,0,.1);--sh2:0 20px 50px rgba(0,0,0,.15);
 }
 
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;touch-action:manipulation;}
 html,body{width:100%;height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;color:var(--text);background:var(--bg);}
 
-/* MAP */
 #map{position:fixed;inset:0;z-index:0;}
-.leaflet-tile-pane{filter:var(--map-filter);transition:filter .5s;}
+.leaflet-tile-pane{transition:filter .4s,opacity .4s;}
 .leaflet-control-zoom a{background:var(--surface)!important;color:var(--text)!important;border:1px solid var(--border2)!important;}
 .leaflet-control-attribution{background:rgba(10,15,30,.75)!important;color:#555!important;font-size:9px!important;}
 
 /* LOADING */
-#loading{position:fixed;inset:0;z-index:9999;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;transition:opacity .5s;}
-.ld-ring{width:52px;height:52px;border-radius:50%;border:3px solid var(--border2);border-top-color:var(--accent);animation:spin .9s linear infinite;}
+#loading{position:fixed;inset:0;z-index:9999;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;transition:opacity .5s;}
+.ld-ring{width:50px;height:50px;border-radius:50%;border:3px solid var(--border2);border-top-color:var(--accent);animation:spin .9s linear infinite;}
 @keyframes spin{to{transform:rotate(360deg)}}
-.ld-title{font-family:'Syne',sans-serif;font-size:28px;font-weight:800;}
-.ld-title em{color:var(--accent);font-style:normal;}
+.ld-logo{font-family:'Syne',sans-serif;font-size:28px;font-weight:800;}
+.ld-logo em{color:var(--accent);font-style:normal;}
+.ld-status{font-size:12px;color:var(--text3);min-height:18px;transition:opacity .3s;}
 
 /* LOGIN */
-#loginScreen{position:fixed;inset:0;z-index:500;background:var(--bg);display:none;flex-direction:column;align-items:center;justify-content:center;gap:22px;padding:28px;text-align:center;}
-.lg-globe{font-size:68px;animation:bob 3s ease-in-out infinite;}
+#loginScreen{position:fixed;inset:0;z-index:500;background:var(--bg);display:none;flex-direction:column;align-items:center;justify-content:center;gap:20px;padding:28px;text-align:center;}
+.lg-globe{font-size:64px;animation:bob 3s ease-in-out infinite;}
 @keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
 .lg-title{font-family:'Syne',sans-serif;font-size:30px;font-weight:800;}
 .lg-title em{color:var(--accent);font-style:normal;}
-.lg-card{width:100%;max-width:340px;background:var(--surface);border-radius:20px;padding:22px;border:1px solid var(--border2);display:flex;flex-direction:column;gap:11px;box-shadow:var(--sh2);}
-.btn-google{width:100%;padding:13px;border-radius:11px;background:var(--surface2);border:1.5px solid var(--border2);color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;font-weight:500;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:9px;transition:background .15s;}
-.btn-anon{width:100%;padding:13px;border-radius:11px;background:linear-gradient(135deg,var(--accent),var(--accent2));border:none;color:#fff;font-family:'Syne',sans-serif;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 4px 14px var(--aglow);}
-.lg-sep{font-size:12px;color:var(--text3);text-align:center;}
+.lg-sub{font-size:13px;color:var(--text2);max-width:280px;line-height:1.7;}
+.lg-card{width:100%;max-width:330px;background:var(--surface);border-radius:20px;padding:20px;border:1px solid var(--border2);display:flex;flex-direction:column;gap:10px;box-shadow:var(--sh2);}
+.btn-google{width:100%;padding:13px;border-radius:11px;background:#fff;border:1.5px solid #e2e8f0;color:#1a1a1a;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;transition:box-shadow .15s;}
+.btn-google:active{box-shadow:0 0 0 3px rgba(66,133,244,.3);}
+.btn-anon{width:100%;padding:13px;border-radius:11px;background:linear-gradient(135deg,var(--accent),var(--accent2));border:none;color:#fff;font-family:'Syne',sans-serif;font-size:14px;font-weight:700;cursor:pointer;}
+.lg-sep{font-size:11px;color:var(--text3);text-align:center;}
+.lg-warn{font-size:11px;color:var(--text3);text-align:center;padding:8px;background:var(--surface2);border-radius:8px;line-height:1.5;}
 
 /* TOP BAR */
-#topBar{position:fixed;top:0;left:0;right:0;z-index:100;height:54px;display:flex;align-items:center;justify-content:space-between;padding:0 13px;background:linear-gradient(180deg,rgba(10,15,30,.96) 0%,transparent 100%);pointer-events:none;}
+#topBar{position:fixed;top:0;left:0;right:0;z-index:100;height:54px;display:flex;align-items:center;justify-content:space-between;padding:0 12px;background:linear-gradient(180deg,rgba(10,15,30,.96) 0%,transparent 100%);pointer-events:none;}
 [data-theme="light"] #topBar{background:linear-gradient(180deg,rgba(240,244,255,.96) 0%,transparent 100%);}
-.top-logo{font-family:'Syne',sans-serif;font-size:17px;font-weight:800;pointer-events:all;cursor:pointer;}
+.top-logo{font-family:'Syne',sans-serif;font-size:17px;font-weight:800;pointer-events:all;}
 .top-logo em{color:var(--accent);font-style:normal;}
 .top-right{display:flex;gap:7px;pointer-events:all;align-items:center;}
 .iBtn{width:34px;height:34px;border-radius:50%;background:var(--surface);border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;font-size:15px;cursor:pointer;backdrop-filter:blur(10px);box-shadow:var(--sh);transition:transform .15s;}
 .iBtn:active{transform:scale(.88);}
-.uAvatar{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--purple));display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;font-family:'Syne',sans-serif;color:#fff;border:2px solid rgba(255,255,255,.2);cursor:pointer;}
+.uAvatar{width:32px;height:32px;border-radius:50%;object-fit:cover;border:2px solid var(--accent);cursor:pointer;background:linear-gradient(135deg,var(--accent),var(--purple));}
+.uAvatarText{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--purple));display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#fff;border:2px solid rgba(255,255,255,.2);cursor:pointer;font-family:'Syne',sans-serif;}
 
 /* STATUS */
 #statusChip{position:fixed;top:62px;left:50%;transform:translateX(-50%);background:var(--surface);border:1px solid var(--border2);border-radius:20px;padding:5px 13px;font-size:11px;color:var(--text2);backdrop-filter:blur(12px);z-index:100;pointer-events:none;display:flex;align-items:center;gap:5px;white-space:nowrap;box-shadow:var(--sh);}
@@ -80,49 +119,55 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:'DM Sans',sans-seri
 .sdot.err{background:var(--red);}
 @keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
 
-/* REAL-TIME DISTANCE */
-#distBar{position:fixed;top:97px;left:50%;transform:translateX(-50%);background:var(--surface);border:1px solid var(--border2);border-radius:20px;padding:5px 14px;font-size:11px;color:var(--accent);backdrop-filter:blur(12px);z-index:100;pointer-events:none;white-space:nowrap;box-shadow:var(--sh);display:none;gap:5px;align-items:center;}
-#distBar.show{display:flex;}
+/* SYNC INDICATOR */
+#syncDot{position:fixed;top:62px;right:13px;z-index:100;width:10px;height:10px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green);display:none;pointer-events:none;}
+#syncDot.syncing{background:var(--gold);box-shadow:0 0 8px var(--gold);animation:blink .6s infinite;}
+#syncDot.show{display:block;}
 
 /* MAP STYLE SWITCHER */
-#mapSwitcher{position:fixed;top:62px;right:13px;z-index:100;display:flex;flex-direction:column;gap:6px;}
-.mapStyleBtn{width:40px;height:40px;border-radius:10px;background:var(--surface);border:1.5px solid var(--border2);display:flex;align-items:center;justify-content:center;font-size:18px;cursor:pointer;backdrop-filter:blur(10px);box-shadow:var(--sh);transition:transform .15s,border-color .15s;}
-.mapStyleBtn:active{transform:scale(.88);}
-.mapStyleBtn.active{border-color:var(--accent);background:var(--aglow);}
+#mapSwitcher{position:fixed;top:78px;right:13px;z-index:100;display:flex;flex-direction:column;gap:6px;}
+.msBtn{width:38px;height:38px;border-radius:10px;background:var(--surface);border:1.5px solid var(--border2);display:flex;align-items:center;justify-content:center;font-size:17px;cursor:pointer;backdrop-filter:blur(10px);box-shadow:var(--sh);transition:transform .15s,border-color .15s;}
+.msBtn:active{transform:scale(.88);}
+.msBtn.active{border-color:var(--accent);background:var(--aglow);}
 
-/* SEARCH BAR */
-#searchBar{position:fixed;top:62px;left:13px;right:60px;z-index:101;display:none;}
+/* FILTER PANEL */
+#mapFilterPanel{position:fixed;top:78px;right:58px;z-index:100;background:var(--surface);border:1px solid var(--border2);border-radius:14px;padding:12px 14px;display:none;flex-direction:column;gap:9px;backdrop-filter:blur(12px);box-shadow:var(--sh);min-width:190px;}
+#mapFilterPanel.show{display:flex;}
+.mfp-title{font-family:'Syne',sans-serif;font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:1px;}
+.mfp-row{display:flex;align-items:center;gap:8px;}
+.mfp-row label{min-width:68px;font-size:11px;color:var(--text2);}
+.mfp-slider{flex:1;-webkit-appearance:none;height:4px;border-radius:2px;background:var(--surface3);outline:none;cursor:pointer;}
+.mfp-slider::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;background:var(--accent);cursor:pointer;}
+.mfp-val{min-width:30px;text-align:right;font-size:11px;font-weight:700;color:var(--accent);font-family:'Syne',sans-serif;}
+.tog-row{display:flex;align-items:center;justify-content:space-between;font-size:11px;color:var(--text2);}
+.tog{width:36px;height:19px;border-radius:10px;background:var(--surface3);border:none;cursor:pointer;position:relative;transition:background .2s;flex-shrink:0;}
+.tog.on{background:var(--accent);}
+.tog::after{content:"";position:absolute;top:3px;left:3px;width:13px;height:13px;border-radius:50%;background:#fff;transition:transform .2s;}
+.tog.on::after{transform:translateX(17px);}
+
+/* ADDRESS SEARCH */
+#searchBar{position:fixed;top:62px;left:13px;right:58px;z-index:101;display:none;}
 #searchBar.show{display:block;}
 #addressInput{width:100%;padding:10px 14px;border-radius:12px;background:var(--surface);border:1.5px solid var(--accent);color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;outline:none;backdrop-filter:blur(12px);box-shadow:var(--sh);}
 #searchResults{background:var(--surface);border:1px solid var(--border2);border-radius:12px;margin-top:4px;overflow:hidden;max-height:200px;overflow-y:auto;box-shadow:var(--sh2);}
-.sr-item{padding:10px 14px;font-size:13px;cursor:pointer;border-bottom:1px solid var(--border);transition:background .15s;}
+.sr-item{padding:10px 14px;font-size:13px;cursor:pointer;border-bottom:1px solid var(--border);}
 .sr-item:last-child{border-bottom:none;}
 .sr-item:active{background:var(--surface2);}
 
 /* PROXIMITY BANNER */
-#proxBanner{position:fixed;top:108px;left:12px;right:12px;z-index:102;background:linear-gradient(135deg,rgba(52,211,153,.16),rgba(52,211,153,.05));border:1px solid rgba(52,211,153,.4);border-radius:16px;padding:11px 14px;display:none;align-items:center;gap:11px;backdrop-filter:blur(12px);cursor:pointer;animation:sli .4s cubic-bezier(.34,1.56,.64,1);box-shadow:var(--sh);}
+#proxBanner{position:fixed;top:108px;left:12px;right:12px;z-index:102;background:linear-gradient(135deg,rgba(52,211,153,.16),rgba(52,211,153,.05));border:1px solid rgba(52,211,153,.4);border-radius:16px;padding:11px 14px;display:none;align-items:center;gap:11px;backdrop-filter:blur(12px);cursor:pointer;box-shadow:var(--sh);animation:sli .4s cubic-bezier(.34,1.56,.64,1);}
 #proxBanner.show{display:flex;}
-@keyframes sli{from{transform:translateY(-16px);opacity:0}to{transform:translateY(0);opacity:1}}
-.pb-icon{font-size:26px;flex-shrink:0;}
-.pb-body{flex:1;}
-.pb-title{font-family:'Syne',sans-serif;font-size:13px;font-weight:700;color:var(--green);}
-.pb-sub{font-size:11px;color:var(--text2);}
-.pb-x{font-size:17px;color:var(--text3);padding:4px;}
-
-/* PWA INSTALL BANNER */
-#pwaBanner{position:fixed;bottom:115px;left:12px;right:12px;z-index:102;background:linear-gradient(135deg,rgba(79,156,249,.18),rgba(79,156,249,.06));border:1px solid rgba(79,156,249,.4);border-radius:16px;padding:13px 15px;display:none;align-items:center;gap:11px;backdrop-filter:blur(12px);box-shadow:var(--sh);animation:sli .4s ease;}
-#pwaBanner.show{display:flex;}
-.pwa-icon{font-size:28px;flex-shrink:0;}
-.pwa-body{flex:1;}
-.pwa-title{font-family:'Syne',sans-serif;font-size:13px;font-weight:700;color:var(--accent);}
-.pwa-sub{font-size:11px;color:var(--text2);margin-top:2px;}
-.btn-install{padding:7px 14px;border-radius:8px;background:var(--accent);border:none;color:#fff;font-family:'Syne',sans-serif;font-size:12px;font-weight:700;cursor:pointer;}
+@keyframes sli{from{transform:translateY(-14px);opacity:0}to{transform:translateY(0);opacity:1}}
 
 /* RADAR */
-#radar{position:fixed;bottom:120px;right:13px;z-index:100;width:88px;height:88px;border-radius:50%;background:rgba(10,15,30,.92);border:1.5px solid var(--border2);backdrop-filter:blur(12px);overflow:hidden;box-shadow:var(--sh);display:none;}
+#radar{position:fixed;bottom:120px;right:13px;z-index:100;width:86px;height:86px;border-radius:50%;background:rgba(10,15,30,.92);border:1.5px solid var(--border2);backdrop-filter:blur(12px);overflow:hidden;box-shadow:var(--sh);display:none;}
 #radar.show{display:block;}
-#radarCanvas{width:88px;height:88px;}
+#radarCanvas{width:86px;height:86px;}
 .radar-lbl{position:absolute;bottom:5px;left:50%;transform:translateX(-50%);font-size:8px;color:var(--text3);letter-spacing:1px;white-space:nowrap;}
+
+/* GPS BANNER */
+#gpsBanner{position:fixed;bottom:108px;left:12px;right:12px;z-index:200;background:var(--surface);border:1.5px solid rgba(251,191,36,.45);border-radius:15px;padding:13px 15px;line-height:1.6;color:var(--text);backdrop-filter:blur(12px);box-shadow:var(--sh2);display:none;}
+#gpsBanner.show{display:block;}
 
 /* FAB */
 #fabZone{position:fixed;bottom:0;left:0;right:0;z-index:100;padding:9px 14px 26px;display:flex;align-items:flex-end;justify-content:space-between;pointer-events:none;}
@@ -133,16 +178,14 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:'DM Sans',sans-seri
 .fmini:active{transform:scale(.88);}
 .fbadge{position:absolute;top:-3px;right:-3px;min-width:17px;height:17px;border-radius:9px;background:var(--accent);color:#fff;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 3px;font-family:'Syne',sans-serif;}
 
-/* AR OVERLAY */
-#arOverlay{position:fixed;inset:0;z-index:200;display:none;flex-direction:column;background:#000;}
-#arOverlay.show{display:flex;}
+/* AR */
+#arOverlay{position:fixed;inset:0;z-index:200;display:none;background:#000;}
+#arOverlay.show{display:block;}
 #arVideo{width:100%;height:100%;object-fit:cover;position:absolute;}
-#arClose{position:absolute;top:18px;right:14px;width:42px;height:42px;border-radius:50%;background:rgba(0,0,0,.7);border:1px solid rgba(255,255,255,.2);color:#fff;font-size:19px;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:5;}
-#arInfo{position:absolute;bottom:36px;left:14px;right:14px;background:rgba(0,0,0,.82);border:1px solid rgba(255,255,255,.15);border-radius:14px;padding:13px 15px;color:#fff;backdrop-filter:blur(10px);z-index:5;}
-.ar-title{font-family:'Syne',sans-serif;font-size:15px;font-weight:700;}
-.ar-dist{font-size:12px;color:rgba(255,255,255,.55);margin-top:3px;}
 #arScan{position:absolute;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--accent),transparent);animation:scan 3s ease-in-out infinite;z-index:4;}
 @keyframes scan{0%{top:0;opacity:1}100%{top:100%;opacity:.2}}
+#arClose{position:absolute;top:18px;right:14px;width:42px;height:42px;border-radius:50%;background:rgba(0,0,0,.7);border:1px solid rgba(255,255,255,.2);color:#fff;font-size:19px;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:5;}
+#arInfo{position:absolute;bottom:36px;left:14px;right:14px;background:rgba(0,0,0,.82);border:1px solid rgba(255,255,255,.15);border-radius:14px;padding:13px 15px;color:#fff;backdrop-filter:blur(10px);z-index:5;display:none;}
 
 /* OVERLAY + SHEET */
 #overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:149;display:none;backdrop-filter:blur(3px);}
@@ -153,7 +196,7 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:'DM Sans',sans-seri
 .sh-head{padding:13px 16px 9px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;border-bottom:1px solid var(--border);}
 .sh-title{font-family:'Syne',sans-serif;font-size:16px;font-weight:700;}
 .sh-close{width:28px;height:28px;border-radius:50%;background:var(--surface2);border:none;color:var(--text2);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;}
-.sh-body{padding:13px 16px 30px;overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:13px;}
+.sh-body{padding:13px 16px 30px;overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:12px;}
 
 /* FORM */
 .fl{font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:5px;}
@@ -161,30 +204,22 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:'DM Sans',sans-seri
 .fi:focus,.fta:focus{border-color:var(--accent);}
 .fta{min-height:76px;resize:none;}
 .fg{display:flex;flex-direction:column;}
-
-/* VISIBILITY */
 .vis-row{display:flex;gap:7px;}
 .vbtn{flex:1;padding:9px 6px;border-radius:10px;border:1.5px solid var(--border2);background:transparent;color:var(--text2);font-size:12px;font-family:'DM Sans',sans-serif;cursor:pointer;transition:all .15s;display:flex;align-items:center;justify-content:center;gap:4px;}
 .vbtn.active{border-color:var(--accent);background:var(--aglow);color:var(--accent);}
-
-/* CATS */
+.vbtn[data-vis="private"].active{border-color:var(--gold);background:rgba(251,191,36,.12);color:var(--gold);}
 .cat-row{display:flex;gap:6px;flex-wrap:wrap;}
 .cchip{padding:5px 11px;border-radius:18px;border:1.5px solid var(--border2);background:transparent;color:var(--text2);font-size:12px;cursor:pointer;transition:all .15s;font-family:'DM Sans',sans-serif;}
 .cchip.sel{border-color:var(--accent);background:var(--aglow);color:var(--accent);}
 
-/* FOLDER CHIPS */
-.folder-row{display:flex;gap:6px;flex-wrap:wrap;}
-.fchip{padding:5px 12px;border-radius:18px;border:1.5px solid var(--border2);background:transparent;color:var(--text2);font-size:12px;cursor:pointer;transition:all .15s;font-family:'DM Sans',sans-serif;display:flex;align-items:center;gap:4px;}
-.fchip.sel{border-color:var(--purple);background:rgba(167,139,250,.12);color:var(--purple);}
-
 /* PHOTO */
 #photoPreview{width:100%;border-radius:11px;max-height:170px;object-fit:cover;display:none;border:1px solid var(--border);}
-.media-btn{width:100%;padding:12px;border-radius:11px;background:var(--surface2);border:1.5px dashed var(--border2);color:var(--text2);font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:7px;transition:border-color .2s,color .2s;}
+.media-btn{width:100%;padding:12px;border-radius:11px;background:var(--surface2);border:1.5px dashed var(--border2);color:var(--text2);font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:7px;}
 .media-btn:active{border-color:var(--accent);color:var(--accent);}
 
 /* AUDIO */
 #audioRec{background:var(--surface2);border-radius:11px;padding:11px 13px;display:flex;align-items:center;gap:9px;}
-#recBtn{width:40px;height:40px;border-radius:50%;border:none;background:var(--red);color:#fff;font-size:17px;cursor:pointer;flex-shrink:0;transition:transform .15s;}
+#recBtn{width:40px;height:40px;border-radius:50%;border:none;background:var(--red);color:#fff;font-size:17px;cursor:pointer;flex-shrink:0;}
 #recBtn.rec{animation:rp .8s ease-in-out infinite;}
 @keyframes rp{0%,100%{box-shadow:0 0 0 0 rgba(248,113,113,.5)}50%{box-shadow:0 0 0 9px rgba(248,113,113,0)}}
 #audioPlayback{width:100%;border-radius:8px;margin-top:5px;display:none;}
@@ -194,52 +229,45 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:'DM Sans',sans-seri
 .btn-p:active{transform:scale(.98);}
 .btn-p:disabled{opacity:.5;pointer-events:none;}
 .btn-row{display:flex;gap:7px;}
-.btn-s{flex:1;padding:10px 7px;border-radius:10px;background:var(--surface2);border:1px solid var(--border2);color:var(--text);font-family:'DM Sans',sans-serif;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;transition:background .15s;}
+.btn-s{flex:1;padding:10px 7px;border-radius:10px;background:var(--surface2);border:1px solid var(--border2);color:var(--text);font-family:'DM Sans',sans-serif;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:4px;transition:background .15s;}
 .btn-s:active{background:var(--surface3);}
 .btn-danger{background:rgba(248,113,113,.1);border-color:rgba(248,113,113,.3);color:var(--red);}
-.btn-whatsapp{background:rgba(37,211,102,.1);border-color:rgba(37,211,102,.4);color:#25d366;}
+.btn-wapp{background:rgba(37,211,102,.1);border-color:rgba(37,211,102,.4);color:#25d366;}
 .btn-star{background:rgba(251,191,36,.1);border-color:rgba(251,191,36,.3);color:var(--gold);}
-.btn-star.starred{background:rgba(251,191,36,.2);}
+.btn-star.on{background:rgba(251,191,36,.22);}
 
 /* MEMORY CARD */
-.mcard{background:var(--surface2);border-radius:13px;border:1px solid var(--border);overflow:hidden;cursor:pointer;transition:transform .15s,border-color .15s;}
+.mcard{background:var(--surface2);border-radius:13px;border:1px solid var(--border);overflow:hidden;cursor:pointer;transition:transform .15s,border-color .15s;margin-bottom:9px;}
 .mcard:active{transform:scale(.98);border-color:var(--accent);}
-.mcard.starred-card{border-color:rgba(251,191,36,.4);}
-.mcard-img{width:100%;height:110px;object-fit:cover;display:block;}
+.mcard.starred{border-color:rgba(251,191,36,.4);}
+.mcard-img{width:100%;height:110px;object-fit:cover;}
 .mcard-body{padding:9px 12px;}
-.mcard-title{font-family:'Syne',sans-serif;font-size:13px;font-weight:700;margin-bottom:4px;display:flex;align-items:center;gap:5px;}
+.mcard-title{font-family:'Syne',sans-serif;font-size:13px;font-weight:700;margin-bottom:4px;}
 .mcard-meta{font-size:11px;color:var(--text2);display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
 .cbadge{padding:2px 7px;border-radius:9px;font-size:10px;font-weight:600;}
 .priv-b{padding:2px 7px;border-radius:9px;font-size:10px;background:rgba(251,191,36,.13);color:var(--gold);}
-
-/* FOLDER CARD */
-.folder-card{background:var(--surface2);border-radius:13px;border:1px solid var(--border);padding:12px 14px;cursor:pointer;transition:transform .15s,border-color .15s;display:flex;align-items:center;gap:10px;}
-.folder-card:active{transform:scale(.98);border-color:var(--purple);}
-.folder-icon{font-size:28px;}
-.folder-info{flex:1;}
-.folder-name{font-family:'Syne',sans-serif;font-size:14px;font-weight:700;}
-.folder-count{font-size:11px;color:var(--text2);}
+.author-b{padding:2px 7px;border-radius:9px;font-size:10px;background:rgba(167,139,250,.13);color:var(--purple);}
 
 /* DETAIL */
-#detailImg{width:100%;border-radius:11px;max-height:210px;object-fit:cover;display:none;}
+#detailImg{width:100%;border-radius:11px;max-height:220px;object-fit:cover;display:none;}
 .detail-text{font-size:14px;line-height:1.75;color:var(--text);background:var(--surface2);border-radius:10px;padding:11px 13px;white-space:pre-wrap;}
 .coords-row{font-size:11px;color:var(--text2);background:var(--surface2);border-radius:8px;padding:8px 11px;display:flex;justify-content:space-between;align-items:center;}
-
-/* COMMENTS */
-.comment-item{background:var(--surface2);border-radius:10px;padding:10px 12px;border:1px solid var(--border);}
-.comment-author{font-family:'Syne',sans-serif;font-size:12px;font-weight:700;color:var(--accent);margin-bottom:4px;}
-.comment-text{font-size:13px;line-height:1.6;color:var(--text);}
-.comment-date{font-size:10px;color:var(--text3);margin-top:3px;}
-
-/* QR */
 #qrWrap{background:#fff;border-radius:13px;padding:14px;display:flex;flex-direction:column;align-items:center;gap:7px;}
 #qrDiv{display:flex;justify-content:center;}
+
+/* COMMENTS */
+.cmt-item{background:var(--surface2);border-radius:10px;padding:10px 12px;border:1px solid var(--border);}
+.cmt-head{display:flex;align-items:center;gap:7px;margin-bottom:4px;}
+.cmt-avatar{width:24px;height:24px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--purple));display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;flex-shrink:0;}
+.cmt-author{font-family:'Syne',sans-serif;font-size:12px;font-weight:700;color:var(--accent);}
+.cmt-date{font-size:10px;color:var(--text3);margin-left:auto;}
+.cmt-text{font-size:13px;line-height:1.6;color:var(--text);}
 
 /* STATS */
 .stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;}
 .stat-card{background:var(--surface2);border-radius:13px;padding:13px;border:1px solid var(--border);}
 .stat-val{font-family:'Syne',sans-serif;font-size:26px;font-weight:800;}
-.stat-lbl{font-size:10px;color:var(--text3);margin-top:2px;letter-spacing:.5px;text-transform:uppercase;}
+.stat-lbl{font-size:10px;color:var(--text3);margin-top:2px;text-transform:uppercase;letter-spacing:.5px;}
 
 /* SEG TABS */
 .seg{display:flex;background:var(--surface2);border-radius:9px;padding:3px;gap:2px;}
@@ -255,9 +283,8 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:'DM Sans',sans-seri
 #toast{position:fixed;bottom:105px;left:50%;transform:translateX(-50%);background:var(--surface);border:1px solid var(--border2);border-radius:18px;padding:8px 16px;font-size:13px;color:var(--text);backdrop-filter:blur(12px);z-index:400;opacity:0;transition:opacity .25s;pointer-events:none;white-space:nowrap;box-shadow:var(--sh);max-width:90vw;text-align:center;}
 #toast.show{opacity:1;}
 
-/* GPS BANNER */
-#gpsBanner{position:fixed;bottom:108px;left:12px;right:12px;z-index:200;background:var(--surface);border:1.5px solid rgba(251,191,36,.45);border-radius:15px;padding:13px 15px;font-size:13px;line-height:1.6;color:var(--text);backdrop-filter:blur(12px);box-shadow:var(--sh2);display:none;}
-#gpsBanner.show{display:block;}
+/* PRIVATE LOCK OVERLAY on map */
+.lock-marker{filter:drop-shadow(0 0 6px rgba(251,191,36,.8));}
 </style>
 </head>
 <body>
@@ -265,21 +292,24 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:'DM Sans',sans-seri
 <!-- LOADING -->
 <div id="loading">
   <div style="font-size:52px">🌍</div>
-  <div class="ld-title">Geo<em>Memory</em></div>
+  <div class="ld-logo">Geo<em>Memory</em> <span style="font-size:14px;font-weight:400;color:var(--text3)">4.0</span></div>
   <div class="ld-ring"></div>
-  <div style="font-size:12px;color:var(--text3)">Versão 3.0</div>
+  <div class="ld-status" id="ldStatus">Conectando ao Firebase...</div>
 </div>
 
 <!-- LOGIN -->
 <div id="loginScreen">
   <div class="lg-globe">🌍</div>
   <div class="lg-title">Geo<em>Memory</em></div>
-  <div style="font-size:14px;color:var(--text2);max-width:290px;line-height:1.7">Memórias digitais fixadas no mundo real</div>
+  <div class="lg-sub">Memórias digitais fixadas no mundo real — compartilhadas com todos</div>
   <div class="lg-card">
-    <button class="btn-google" onclick="loginGoogle()">🔵 Entrar com Google</button>
-    <div class="lg-sep">— ou —</div>
-    <button class="btn-anon" onclick="loginAnon()">🚀 Entrar como visitante</button>
-    <div style="font-size:11px;color:var(--text3);text-align:center">Visitante: dados ficam neste dispositivo</div>
+    <button class="btn-google" onclick="loginGoogle()">
+      <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.08 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-3.59-13.43-8.83l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+      Entrar com Google
+    </button>
+    <div class="lg-sep">— ou continue sem conta —</div>
+    <button class="btn-anon" onclick="loginAnon()">👤 Entrar como visitante</button>
+    <div class="lg-warn">⚠️ Visitante: dados ficam só neste dispositivo.<br>Use Google para sincronizar entre aparelhos.</div>
   </div>
 </div>
 
@@ -298,68 +328,59 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:'DM Sans',sans-seri
     <line x1="54" y1="38" x2="66" y2="38" stroke="#4f9cf9" stroke-width="1.5"/>
   </svg>
   <button id="arClose" onclick="closeAR()">✕</button>
-  <div id="arInfo" style="display:none">
-    <div class="ar-title" id="arTitle"></div>
-    <div class="ar-dist" id="arDist"></div>
-  </div>
+  <div id="arInfo"><div style="font-family:'Syne',sans-serif;font-size:15px;font-weight:700" id="arTitle"></div><div style="font-size:12px;color:rgba(255,255,255,.55);margin-top:3px" id="arDist"></div></div>
 </div>
 
 <!-- TOP BAR -->
 <div id="topBar">
-  <div class="top-logo" onclick="closeAllSheets()">Geo<em>Memory</em> <span style="font-size:10px;font-weight:400;color:var(--text3)">3.0</span></div>
+  <div class="top-logo">Geo<em>Memory</em></div>
   <div class="top-right">
-    <div class="iBtn" onclick="toggleAddressSearch()" id="searchToggle" title="Buscar endereço">🔍</div>
+    <div class="iBtn" onclick="toggleSearch()" id="searchToggle">🔍</div>
     <div class="iBtn" onclick="toggleTheme()">🌙</div>
-    <div class="uAvatar" id="uAvatar" onclick="openSheet('profileSheet')">?</div>
+    <div id="uAvatarWrap" onclick="openSheet('profileSheet')"></div>
   </div>
 </div>
 
-<!-- ADDRESS SEARCH BAR -->
+<!-- SEARCH -->
 <div id="searchBar">
-  <input class="fi" id="addressInput" placeholder="🔍 Buscar endereço ou cidade..." oninput="searchAddress()" onblur="setTimeout(()=>document.getElementById('searchResults').innerHTML='',300)">
+  <input class="fi" id="addressInput" placeholder="🔍 Buscar endereço ou cidade..." oninput="searchAddress()" onblur="setTimeout(()=>{document.getElementById('searchResults').innerHTML=''},300)">
   <div id="searchResults"></div>
 </div>
 
-<!-- STATUS -->
+<!-- STATUS + SYNC -->
 <div id="statusChip"><div class="sdot" id="sdot"></div><span id="statusTxt">Iniciando...</span></div>
+<div id="syncDot" title="Sincronizando..."></div>
 
-<!-- DISTANCE BAR -->
-<div id="distBar">📏 <span id="distTxt"></span></div>
-
-<!-- MAP STYLE SWITCHER -->
-<div id="mapSwitcher">
-  <div class="mapStyleBtn active" data-layer="streets" onclick="switchMap(this)" title="Ruas">🏙️</div>
-  <div class="mapStyleBtn" data-layer="satellite" onclick="switchMap(this)" title="Satélite">🛰️</div>
-  <div class="mapStyleBtn" data-layer="dark" onclick="switchMap(this)" title="Noturno">🌙</div>
-  <div class="mapStyleBtn" data-layer="topo" onclick="switchMap(this)" title="Topográfico">🏔️</div>
-</div>
-
-<!-- PROXIMITY BANNER -->
+<!-- PROXIMITY -->
 <div id="proxBanner" onclick="onProxTap()">
-  <div class="pb-icon">📍</div>
-  <div class="pb-body">
-    <div class="pb-title" id="proxTitle">Memória próxima!</div>
-    <div class="pb-sub" id="proxSub">Toque para ver</div>
-  </div>
-  <div class="pb-x" onclick="event.stopPropagation();hideProx()">✕</div>
+  <div style="font-size:26px;flex-shrink:0">📍</div>
+  <div style="flex:1"><div style="font-family:'Syne',sans-serif;font-size:13px;font-weight:700;color:var(--green)" id="proxTitle"></div><div style="font-size:11px;color:var(--text2)" id="proxSub"></div></div>
+  <div style="font-size:17px;color:var(--text3);padding:4px" onclick="event.stopPropagation();hideProx()">✕</div>
 </div>
 
-<!-- PWA INSTALL -->
-<div id="pwaBanner">
-  <div class="pwa-icon">📱</div>
-  <div class="pwa-body">
-    <div class="pwa-title">Instalar GeoMemory</div>
-    <div class="pwa-sub">Adicionar à tela inicial como app</div>
-  </div>
-  <button class="btn-install" id="installBtn" onclick="installPWA()">Instalar</button>
-  <div class="pb-x" onclick="document.getElementById('pwaBanner').classList.remove('show')">✕</div>
+<!-- MAP SWITCHER -->
+<div id="mapSwitcher">
+  <div class="msBtn active" data-layer="streets" onclick="switchMap(this)">🏙️</div>
+  <div class="msBtn" data-layer="satellite" onclick="switchMap(this)">🛰️</div>
+  <div class="msBtn" data-layer="dark" onclick="switchMap(this)">🌙</div>
+  <div class="msBtn" data-layer="topo" onclick="switchMap(this)">🏔️</div>
+  <div class="msBtn" onclick="toggleFilterPanel()" id="filterToggleBtn">🎛️</div>
+</div>
+
+<!-- MAP FILTER PANEL -->
+<div id="mapFilterPanel">
+  <div class="mfp-title">🎛️ Ajustes</div>
+  <div class="mfp-row"><label>☀️ Brilho</label><input class="mfp-slider" type="range" min="30" max="130" value="100" id="slBright" oninput="applyMapFilter()"><span class="mfp-val" id="vBright">100%</span></div>
+  <div class="mfp-row"><label>🎨 Saturação</label><input class="mfp-slider" type="range" min="0" max="200" value="100" id="slSat" oninput="applyMapFilter()"><span class="mfp-val" id="vSat">100%</span></div>
+  <div class="mfp-row"><label>👁️ Opacidade</label><input class="mfp-slider" type="range" min="30" max="100" value="100" id="slOpac" oninput="applyMapFilter()"><span class="mfp-val" id="vOpac">100%</span></div>
+  <div class="mfp-row"><label>🌡️ Contraste</label><input class="mfp-slider" type="range" min="50" max="200" value="100" id="slContr" oninput="applyMapFilter()"><span class="mfp-val" id="vContr">100%</span></div>
+  <div class="tog-row"><span>🌙 Filtro noite</span><button class="tog" id="togHue" onclick="toggleHue()"></button></div>
+  <div class="tog-row"><span>📍 Marcadores</span><button class="tog on" id="togMarkers" onclick="toggleMarkers()"></button></div>
+  <button onclick="resetMapFilter()" style="padding:8px;border-radius:9px;background:var(--surface2);border:1px solid var(--border2);color:var(--text2);font-size:12px;cursor:pointer;font-family:'DM Sans',sans-serif;">↺ Padrões</button>
 </div>
 
 <!-- RADAR -->
-<div id="radar">
-  <canvas id="radarCanvas" width="88" height="88"></canvas>
-  <div class="radar-lbl">RADAR</div>
-</div>
+<div id="radar"><canvas id="radarCanvas" width="86" height="86"></canvas><div class="radar-lbl">RADAR</div></div>
 
 <!-- GPS BANNER -->
 <div id="gpsBanner"></div>
@@ -367,27 +388,24 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:'DM Sans',sans-seri
 <!-- FAB -->
 <div id="fabZone">
   <div class="fab-col">
-    <div class="fmini" onclick="openSheet('foldersSheet')">📁<div class="fbadge" id="folderCount">0</div></div>
+    <div class="fmini" onclick="openSheet('listSheet')">📋<div class="fbadge" id="memCount">0</div></div>
     <div class="fmini" onclick="centerOnMe()">🎯</div>
   </div>
   <div id="fabMain" onclick="startAdd()">＋</div>
   <div class="fab-col">
-    <div class="fmini" onclick="openSheet('listSheet')">📋<div class="fbadge" id="memCount">0</div></div>
     <div class="fmini" onclick="openSheet('statsSheet')">📊</div>
+    <div class="fmini" onclick="openSheet('profileSheet')">👤</div>
   </div>
 </div>
 
-<!-- OVERLAY & TOAST -->
+<!-- OVERLAY + TOAST -->
 <div id="overlay" onclick="closeAllSheets()"></div>
 <div id="toast"></div>
 
 <!-- ═══ SHEET: ADD/EDIT ═══ -->
 <div class="sheet" id="addSheet">
   <div class="sh-handle"></div>
-  <div class="sh-head">
-    <div class="sh-title" id="addTitle">📍 Nova Memória</div>
-    <button class="sh-close" onclick="closeAllSheets()">✕</button>
-  </div>
+  <div class="sh-head"><div class="sh-title" id="addShTitle">📍 Nova Memória</div><button class="sh-close" onclick="closeAllSheets()">✕</button></div>
   <div class="sh-body">
     <input type="hidden" id="editId">
     <div class="fg"><div class="fl">Título</div><input class="fi" id="fTitle" placeholder="Nome deste lugar..." maxlength="60"></div>
@@ -396,8 +414,8 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:'DM Sans',sans-seri
       <div class="vis-row">
         <button class="vbtn active" data-vis="public" onclick="selVis(this)">🌍 Pública</button>
         <button class="vbtn" data-vis="private" onclick="selVis(this)">🔒 Privada</button>
-        <button class="vbtn" data-vis="friends" onclick="selVis(this)">👥 Amigos</button>
       </div>
+      <div id="visHint" style="font-size:11px;color:var(--text3);margin-top:6px;padding:8px;background:var(--surface2);border-radius:8px;line-height:1.5">🌍 Pública: todos os usuários verão no mapa em tempo real</div>
     </div>
     <div class="fg">
       <div class="fl">Categoria</div>
@@ -410,11 +428,6 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:'DM Sans',sans-seri
         <div class="cchip" data-cat="❤️ Amor" onclick="selCat(this)">❤️ Amor</div>
         <div class="cchip" data-cat="🚨 SOS" onclick="selCat(this)">🚨 SOS</div>
       </div>
-    </div>
-    <div class="fg">
-      <div class="fl">Pasta / Álbum</div>
-      <div class="folder-row" id="folderPickRow"></div>
-      <button class="media-btn" onclick="promptNewFolder()" style="margin-top:6px;border-style:dashed">➕ Nova pasta</button>
     </div>
     <div class="fg"><div class="fl">Mensagem</div><textarea class="fta" id="fText" placeholder="Escreva sua memória..."></textarea></div>
     <div class="fg">
@@ -433,29 +446,24 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:'DM Sans',sans-seri
     </div>
     <div class="fg">
       <div class="fl">Localização</div>
-      <div style="font-size:12px;color:var(--text2);background:var(--surface2);border-radius:10px;padding:9px 12px;line-height:1.6">
-        <div id="fCoords">📍 Posição atual</div>
-        <div style="font-size:11px;color:var(--text3);margin-top:2px">Ou toque no mapa para escolher outro ponto</div>
-      </div>
+      <div style="font-size:11px;color:var(--text3);background:var(--surface2);border-radius:8px;padding:7px 11px;line-height:1.5">📸 Fotos salvas direto no banco de dados (gratuito). Comprimidas automaticamente para ≤700KB.</div>
+    <div style="font-size:12px;color:var(--text2);background:var(--surface2);border-radius:10px;padding:9px 12px;line-height:1.6"><div id="fCoords">📍 Posição atual</div><div style="font-size:11px;color:var(--text3);margin-top:2px">Ou toque no mapa para escolher outro ponto</div></div>
     </div>
-    <button class="btn-p" id="saveBtn" onclick="saveMemory()">💾 Salvar Memória</button>
+    <button class="btn-p" id="saveBtn" onclick="saveMemory()">☁️ Salvar na Nuvem</button>
   </div>
 </div>
 
 <!-- ═══ SHEET: LIST ═══ -->
 <div class="sheet" id="listSheet">
   <div class="sh-handle"></div>
-  <div class="sh-head">
-    <div class="sh-title">🗂️ Memórias</div>
-    <button class="sh-close" onclick="closeAllSheets()">✕</button>
-  </div>
+  <div class="sh-head"><div class="sh-title">🗂️ Memórias</div><button class="sh-close" onclick="closeAllSheets()">✕</button></div>
   <div class="sh-body">
     <input class="fi" id="listSearch" placeholder="🔍 Buscar..." oninput="renderList()">
-    <div class="seg" id="listSeg">
-      <button class="seg-t active" data-f="all" onclick="setListFilter(this)">Todas</button>
-      <button class="seg-t" data-f="public" onclick="setListFilter(this)">🌍</button>
-      <button class="seg-t" data-f="private" onclick="setListFilter(this)">🔒</button>
-      <button class="seg-t" data-f="starred" onclick="setListFilter(this)">⭐</button>
+    <div class="seg">
+      <button class="seg-t active" data-f="all" onclick="setLF(this)">Todas</button>
+      <button class="seg-t" data-f="public" onclick="setLF(this)">🌍 Públicas</button>
+      <button class="seg-t" data-f="mine" onclick="setLF(this)">👤 Minhas</button>
+      <button class="seg-t" data-f="starred" onclick="setLF(this)">⭐</button>
     </div>
     <div id="listBody"></div>
   </div>
@@ -464,181 +472,214 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:'DM Sans',sans-seri
 <!-- ═══ SHEET: DETAIL ═══ -->
 <div class="sheet" id="detailSheet">
   <div class="sh-handle"></div>
-  <div class="sh-head">
-    <div class="sh-title" id="dtTitle">Memória</div>
-    <button class="sh-close" onclick="closeAllSheets()">✕</button>
-  </div>
+  <div class="sh-head"><div class="sh-title" id="dtTitle">Memória</div><button class="sh-close" onclick="closeAllSheets()">✕</button></div>
   <div class="sh-body">
     <img id="detailImg" alt="foto"/>
     <div id="dtBadges" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"></div>
     <div class="fg"><div class="fl">Mensagem</div><div class="detail-text" id="dtText"></div></div>
     <div id="dtAudioWrap" class="fg" style="display:none"><div class="fl">Áudio</div><audio id="dtAudio" controls style="width:100%;border-radius:8px;"></audio></div>
-    <div class="fg">
-      <div class="fl">Localização</div>
-      <div class="coords-row"><span id="dtCoords" style="font-family:monospace;font-size:11px"></span><span id="dtDist" style="color:var(--green);font-size:12px;font-weight:600"></span></div>
-    </div>
+    <div class="fg"><div class="fl">Localização</div><div class="coords-row"><span id="dtCoords" style="font-family:monospace;font-size:11px"></span><span id="dtDist" style="color:var(--green);font-size:12px;font-weight:600"></span></div></div>
     <div class="fg"><div class="fl">QR Code</div><div id="qrWrap"><div id="qrDiv"></div><div style="font-size:10px;color:#888;text-align:center" id="qrLbl"></div></div></div>
+    <div class="fg"><div class="fl">Criado por</div><div style="font-size:13px;color:var(--text2)" id="dtAuthor"></div></div>
     <div class="fg"><div class="fl">Data</div><div style="font-size:12px;color:var(--text2)" id="dtDate"></div></div>
     <div class="btn-row">
       <button class="btn-s" onclick="navToMemory()">🗺️ IR</button>
-      <button class="btn-s btn-whatsapp" onclick="shareWhatsapp()">💬 WhatsApp</button>
+      <button class="btn-s btn-wapp" onclick="shareWhatsapp()">💬 WhatsApp</button>
       <button class="btn-s" onclick="shareMemory()">🔗 Link</button>
       <button class="btn-s" onclick="openARMode()">📷 AR</button>
     </div>
-    <div class="btn-row">
-      <button class="btn-s btn-star" id="starBtn" onclick="toggleStar()">⭐ Favoritar</button>
+    <div class="btn-row" id="ownerBtns" style="display:none">
+      <button class="btn-s btn-star" id="starBtn" onclick="toggleStar()">☆ Favoritar</button>
       <button class="btn-s" onclick="editMemory()">✏️ Editar</button>
       <button class="btn-s btn-danger" onclick="deleteMemory()">🗑️</button>
     </div>
-    <!-- COMMENTS -->
+    <div class="btn-row" id="nonOwnerBtns" style="display:none">
+      <button class="btn-s btn-star" id="starBtnGuest" onclick="toggleStar()">☆ Favoritar</button>
+    </div>
     <div class="fg">
-      <div class="fl">Comentários</div>
-      <div id="commentsList"></div>
+      <div class="fl">Comentários <span id="cmtCount" style="color:var(--text3)"></span></div>
+      <div id="cmtList"></div>
       <div style="display:flex;gap:7px;margin-top:6px">
-        <input class="fi" id="commentInput" placeholder="Escreva um comentário..." style="flex:1">
-        <button class="btn-p" onclick="addComment()" style="width:44px;padding:0;flex-shrink:0">➤</button>
+        <input class="fi" id="cmtInput" placeholder="Comentar..." style="flex:1">
+        <button class="btn-p" onclick="addComment()" style="width:44px;padding:0;flex-shrink:0;font-size:18px">➤</button>
       </div>
     </div>
   </div>
 </div>
 
-<!-- ═══ SHEET: FOLDERS ═══ -->
-<div class="sheet" id="foldersSheet">
-  <div class="sh-handle"></div>
-  <div class="sh-head">
-    <div class="sh-title">📁 Pastas</div>
-    <button class="sh-close" onclick="closeAllSheets()">✕</button>
-  </div>
-  <div class="sh-body">
-    <button class="btn-p" onclick="promptNewFolder()">➕ Nova Pasta</button>
-    <div id="folderList"></div>
-  </div>
-</div>
-
-<!-- ═══ SHEET: FOLDER DETAIL ═══ -->
-<div class="sheet" id="folderDetailSheet">
-  <div class="sh-handle"></div>
-  <div class="sh-head">
-    <div class="sh-title" id="fdTitle">Pasta</div>
-    <button class="sh-close" onclick="closeAllSheets()">✕</button>
-  </div>
-  <div class="sh-body" id="fdBody"></div>
-</div>
-
 <!-- ═══ SHEET: STATS ═══ -->
 <div class="sheet" id="statsSheet">
   <div class="sh-handle"></div>
-  <div class="sh-head">
-    <div class="sh-title">📊 Estatísticas</div>
-    <button class="sh-close" onclick="closeAllSheets()">✕</button>
-  </div>
+  <div class="sh-head"><div class="sh-title">📊 Estatísticas</div><button class="sh-close" onclick="closeAllSheets()">✕</button></div>
   <div class="sh-body" id="statsBody"></div>
 </div>
 
 <!-- ═══ SHEET: PROFILE ═══ -->
 <div class="sheet" id="profileSheet">
   <div class="sh-handle"></div>
-  <div class="sh-head">
-    <div class="sh-title">👤 Perfil</div>
-    <button class="sh-close" onclick="closeAllSheets()">✕</button>
-  </div>
+  <div class="sh-head"><div class="sh-title">👤 Perfil</div><button class="sh-close" onclick="closeAllSheets()">✕</button></div>
   <div class="sh-body" id="profileBody"></div>
 </div>
 
 <script>
 'use strict';
-// ════════════════════════════════════════
-//  CONSTANTS
-// ════════════════════════════════════════
-const SK = 'gm3_mem', UK = 'gm3_user', FK = 'gm3_folders', PROX = 80;
-const COLORS = {'📸 Foto':'#4f9cf9','💬 Mensagem':'#34d399','⚠️ Alerta':'#f87171','🎨 Arte':'#a78bfa','🕐 Cápsula':'#fbbf24','❤️ Amor':'#f472b6','🚨 SOS':'#ff3b30'};
-const LAYERS = {
-  streets:  'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-  satellite:'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-  dark:     'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-  topo:     'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
-};
-const LAYER_ATTR = {
-  streets:'© OpenStreetMap',
-  satellite:'© Esri, Maxar, GeoEye',
-  dark:'© CARTO © OpenStreetMap',
-  topo:'© OpenTopoMap © OpenStreetMap',
-};
 
 // ════════════════════════════════════════
-//  STATE
+//  WAIT FOR FIREBASE
 // ════════════════════════════════════════
+window.addEventListener('firebase-ready', initApp);
+// Fallback if module fails (e.g. wrong credentials)
+setTimeout(()=>{ if(!window._fb) { ldStatus('⚠️ Erro Firebase — verifique as credenciais'); setTimeout(showOfflineMode,2000); } }, 6000);
+
+const COLORS={'📸 Foto':'#4f9cf9','💬 Mensagem':'#34d399','⚠️ Alerta':'#f87171','🎨 Arte':'#a78bfa','🕐 Cápsula':'#fbbf24','❤️ Amor':'#f472b6','🚨 SOS':'#ff3b30'};
+const LAYERS={streets:'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',satellite:'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',dark:'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',topo:'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png'};
+const LAYER_ATTR={streets:'© OpenStreetMap',satellite:'© Esri',dark:'© CARTO © OSM',topo:'© OpenTopoMap'};
+const PROX=80, SK_LOCAL='gm4_local', SK_STAR='gm4_stars';
+
 let map, tileLayer, userMarker, accCircle;
-let memories=[], folders=[], markerMap={};
+let memories=[], markerMap={}, unsubscribe=null;
 let userPos=null, currentUser=null;
-let selCatV='📸 Foto', selVisV='public', selFolderV=null;
+let selCatV='📸 Foto', selVisV='public';
 let pendingLatLng=null, currentDetailId=null, nearbyId=null;
 let photoData=null, audioData=null;
 let mediaRecorder=null, recInterval=null, recSecs=0;
-let arStream=null, isDark=true;
-let listFilter='all', currentLayer='streets';
-let deferredPrompt=null;
-let distInterval=null;
+let arStream=null, isDark=true, currentLayer='streets';
+let listFilter='all', markersVisible=true, mapHue=false;
+let starred=new Set(JSON.parse(localStorage.getItem(SK_STAR)||'[]'));
 
 // ════════════════════════════════════════
-//  PWA MANIFEST (inline)
+//  INIT
 // ════════════════════════════════════════
-const manifest = {name:'GeoMemory',short_name:'GeoMemory',start_url:'.',display:'standalone',background_color:'#0a0f1e',theme_color:'#0a0f1e',description:'Memórias geolocalizadas',icons:[{src:'data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌍</text></svg>',sizes:'192x192',type:'image/svg+xml'}]};
-const blob = new Blob([JSON.stringify(manifest)],{type:'application/json'});
-document.getElementById('manifestLink').href = URL.createObjectURL(blob);
-
-// PWA install prompt
-window.addEventListener('beforeinstallprompt',e=>{
-  e.preventDefault(); deferredPrompt=e;
-  setTimeout(()=>document.getElementById('pwaBanner').classList.add('show'),4000);
-});
-
-function installPWA(){
-  if(!deferredPrompt) return;
-  deferredPrompt.prompt();
-  deferredPrompt.userChoice.then(()=>{deferredPrompt=null;document.getElementById('pwaBanner').classList.remove('show');});
+function initApp(){
+  ldStatus('Firebase conectado ✓');
+  setTheme(localStorage.getItem('gm4_theme')||'dark');
+  const {auth,onAuthStateChanged}=window._fb;
+  onAuthStateChanged(auth, user=>{
+    if(user){
+      currentUser={
+        id: user.uid,
+        name: user.displayName||'Visitante',
+        email: user.email||'',
+        photo: user.photoURL||null,
+        anon: user.isAnonymous,
+        avatar: (user.displayName||'V')[0].toUpperCase()
+      };
+      updateAvatar();
+      document.getElementById('loginScreen').style.display='none';
+      startMapAndGPS();
+      subscribeMemories();
+    } else {
+      document.getElementById('loginScreen').style.display='flex';
+      forceHideLoading();
+    }
+  });
 }
 
-// ════════════════════════════════════════
-//  BOOT
-// ════════════════════════════════════════
-window.addEventListener('load',()=>{
-  loadData();
-  setTheme(localStorage.getItem('gm3_theme')||'dark');
-  setTimeout(forceHideLoading,3500);
-  try{ currentUser=JSON.parse(localStorage.getItem(UK)||'null'); }catch{currentUser=null;}
-  if(currentUser){ document.getElementById('loginScreen').style.display='none'; showApp(); }
-  else { forceHideLoading(); document.getElementById('loginScreen').style.display='flex'; }
-  checkURLParam();
-});
-
-function forceHideLoading(){const l=document.getElementById('loading');l.style.opacity='0';setTimeout(()=>l.style.display='none',400);}
-
-function showApp(){
+function showOfflineMode(){
+  // Fallback to localStorage if Firebase fails
+  currentUser={id:'offline',name:'Offline',avatar:'📴',anon:true};
+  updateAvatar();
   document.getElementById('loginScreen').style.display='none';
-  updateAvatar(); initMap(); startGPS(); updateCounts(); forceHideLoading();
-  startDistanceUpdater();
+  memories=JSON.parse(localStorage.getItem(SK_LOCAL)||'[]');
+  startMapAndGPS();
+  memories.forEach(m=>addMarker(m));
+  updateCount();
+  forceHideLoading();
+  showToast('⚠️ Modo offline — dados locais apenas');
 }
+
+function startMapAndGPS(){
+  initMap();
+  startGPS();
+  setInterval(drawRadar,50);
+  document.getElementById('radar').classList.add('show');
+  forceHideLoading();
+}
+
+function ldStatus(t){ const el=document.getElementById('ldStatus'); if(el)el.textContent=t; }
+function forceHideLoading(){ const l=document.getElementById('loading'); if(l){l.style.opacity='0';setTimeout(()=>l.style.display='none',400);} }
 
 // ════════════════════════════════════════
 //  AUTH
 // ════════════════════════════════════════
-function loginGoogle(){
-  const name=prompt('Login Google (simulação)\nDigite seu nome:','');
-  if(!name) return;
-  currentUser={id:'g_'+Date.now(),name,type:'google',avatar:name[0].toUpperCase()};
-  localStorage.setItem(UK,JSON.stringify(currentUser));
-  showApp(); showToast('👋 Bem-vindo, '+name+'!');
+async function loginGoogle(){
+  const {auth,signInWithPopup,provider}=window._fb;
+  try{ await signInWithPopup(auth,provider); }
+  catch(e){ showToast('⚠️ '+e.message); }
 }
-function loginAnon(){
-  currentUser={id:'a_'+Date.now(),name:'Visitante',type:'anon',avatar:'👤'};
-  localStorage.setItem(UK,JSON.stringify(currentUser));
-  showApp();
+
+async function loginAnon(){
+  const {auth,signInAnonymously}=window._fb;
+  try{ await signInAnonymously(auth); }
+  catch(e){ showToast('⚠️ '+e.message); }
 }
-function updateAvatar(){if(!currentUser)return;document.getElementById('uAvatar').textContent=currentUser.avatar||'?';}
+
+function updateAvatar(){
+  const wrap=document.getElementById('uAvatarWrap');
+  if(!wrap)return;
+  if(currentUser?.photo){
+    wrap.innerHTML=`<img class="uAvatar" src="${currentUser.photo}" referrerpolicy="no-referrer">`;
+  } else {
+    wrap.innerHTML=`<div class="uAvatarText">${currentUser?.avatar||'?'}</div>`;
+  }
+  wrap.onclick=()=>openSheet('profileSheet');
+}
 
 // ════════════════════════════════════════
-//  MAP INIT
+//  FIRESTORE — REAL-TIME LISTENER
+// ════════════════════════════════════════
+function subscribeMemories(){
+  const {db,collection,query,where,onSnapshot,orderBy}=window._fb;
+  if(unsubscribe)unsubscribe();
+
+  // Listen to PUBLIC memories
+  const pubQ=query(collection(db,'memories'),where('visibility','==','public'),orderBy('createdAt','desc'));
+  const pubUnsub=onSnapshot(pubQ, snap=>{
+    snap.docChanges().forEach(change=>{
+      const data={id:change.doc.id,...change.doc.data()};
+      if(change.type==='added'||change.type==='modified'){
+        const idx=memories.findIndex(m=>m.id===data.id);
+        if(idx>=0)memories[idx]=data; else memories.push(data);
+        addMarker(data);
+      }
+      if(change.type==='removed'){
+        memories=memories.filter(m=>m.id!==data.id);
+        if(markerMap[data.id]){map.removeLayer(markerMap[data.id]);delete markerMap[data.id];}
+      }
+    });
+    updateCount(); renderList();
+    setSynced();
+  },err=>{ showToast('⚠️ Erro sync: '+err.code); setSynced(); });
+
+  // Listen to MY PRIVATE memories
+  let privUnsub=()=>{};
+  if(currentUser && !currentUser.anon){
+    const privQ=query(collection(db,'memories'),where('visibility','==','private'),where('authorId','==',currentUser.id));
+    privUnsub=onSnapshot(privQ, snap=>{
+      snap.docChanges().forEach(change=>{
+        const data={id:change.doc.id,...change.doc.data()};
+        if(change.type==='added'||change.type==='modified'){
+          const idx=memories.findIndex(m=>m.id===data.id);
+          if(idx>=0)memories[idx]=data; else memories.push(data);
+          addMarker(data);
+        }
+        if(change.type==='removed'){
+          memories=memories.filter(m=>m.id!==data.id);
+          if(markerMap[data.id]){map.removeLayer(markerMap[data.id]);delete markerMap[data.id];}
+        }
+      });
+      updateCount(); renderList();
+    });
+  }
+
+  unsubscribe=()=>{pubUnsub();privUnsub();};
+}
+
+function setSyncing(){ const d=document.getElementById('syncDot'); d.classList.add('show','syncing'); }
+function setSynced(){ const d=document.getElementById('syncDot'); d.classList.add('show'); d.classList.remove('syncing'); setTimeout(()=>d.classList.remove('show'),3000); }
+
+// ════════════════════════════════════════
+//  MAP
 // ════════════════════════════════════════
 function initMap(){
   map=L.map('map',{zoomControl:true}).setView([-15.78,-47.93],14);
@@ -648,200 +689,141 @@ function initMap(){
     document.getElementById('fCoords').textContent=`📍 ${e.latlng.lat.toFixed(6)}, ${e.latlng.lng.toFixed(6)}`;
     startAdd();
   });
-  renderAllMarkers();
-  document.getElementById('radar').classList.add('show');
-  setInterval(drawRadar,50);
 }
 
-// ════════════════════════════════════════
-//  MAP STYLE SWITCHER
-// ════════════════════════════════════════
+// MAP STYLE
 function switchMap(btn){
   const layer=btn.dataset.layer;
   if(layer===currentLayer)return;
   currentLayer=layer;
   map.removeLayer(tileLayer);
   tileLayer=L.tileLayer(LAYERS[layer],{attribution:LAYER_ATTR[layer],maxZoom:19}).addTo(map);
-  // Satellite: remove dark filter
-  if(layer==='satellite'){
-    document.querySelector('.leaflet-tile-pane').style.filter='none';
-  } else {
-    document.querySelector('.leaflet-tile-pane').style.filter='';
-  }
-  document.querySelectorAll('.mapStyleBtn').forEach(b=>b.classList.toggle('active',b.dataset.layer===layer));
-  showToast({streets:'🏙️ Mapa de ruas',satellite:'🛰️ Satélite',dark:'🌙 Noturno',topo:'🏔️ Topográfico'}[layer]);
+  if(layer==='satellite'){mapHue=false;if(document.getElementById('togHue'))document.getElementById('togHue').classList.remove('on');}
+  applyMapFilter();
+  document.querySelectorAll('.msBtn').forEach(b=>b.classList.toggle('active',b.dataset.layer===layer&&!!b.dataset.layer));
+  showToast({streets:'🏙️ Ruas',satellite:'🛰️ Satélite (sem filtro)',dark:'🌙 Noturno',topo:'🏔️ Topográfico'}[layer]);
 }
 
-// ════════════════════════════════════════
-//  ADDRESS SEARCH
-// ════════════════════════════════════════
+let mapFilterState={bright:100,sat:100,opac:100,contr:100};
+function applyMapFilter(){
+  const b=+document.getElementById('slBright')?.value||100;
+  const s=+document.getElementById('slSat')?.value||100;
+  const o=+document.getElementById('slOpac')?.value||100;
+  const c=+document.getElementById('slContr')?.value||100;
+  ['vBright','vSat','vOpac','vContr'].forEach((id,i)=>{const el=document.getElementById(id);if(el)el.textContent=[b,s,o,c][i]+'%';});
+  const hue=mapHue&&currentLayer!=='satellite'?'hue-rotate(195deg)':'';
+  const pane=document.querySelector('.leaflet-tile-pane');
+  if(pane){pane.style.filter=`brightness(${b/100}) saturate(${s/100}) contrast(${c/100}) ${hue}`;pane.style.opacity=o/100;}
+}
+function toggleHue(){mapHue=!mapHue;document.getElementById('togHue').classList.toggle('on',mapHue);applyMapFilter();}
+function toggleMarkers(){
+  markersVisible=!markersVisible;
+  document.getElementById('togMarkers').classList.toggle('on',markersVisible);
+  Object.values(markerMap).forEach(mk=>{if(markersVisible)mk.addTo(map);else map.removeLayer(mk);});
+  if(userMarker){markersVisible?userMarker.addTo(map):map.removeLayer(userMarker);}
+}
+function resetMapFilter(){
+  ['slBright','slSat','slOpac','slContr'].forEach(id=>{const el=document.getElementById(id);if(el)el.value=100;});
+  mapHue=false; document.getElementById('togHue').classList.remove('on'); applyMapFilter();
+}
+function toggleFilterPanel(){document.getElementById('mapFilterPanel').classList.toggle('show');}
+document.addEventListener('click',e=>{const p=document.getElementById('mapFilterPanel'),b=document.getElementById('filterToggleBtn');if(p&&!p.contains(e.target)&&b&&!b.contains(e.target))p.classList.remove('show');});
+
+// ADDRESS SEARCH
 let searchTimer=null;
-function toggleAddressSearch(){
-  const bar=document.getElementById('searchBar');
-  bar.classList.toggle('show');
-  if(bar.classList.contains('show')) document.getElementById('addressInput').focus();
-  else document.getElementById('searchResults').innerHTML='';
-}
-
+function toggleSearch(){const bar=document.getElementById('searchBar');bar.classList.toggle('show');if(bar.classList.contains('show'))document.getElementById('addressInput').focus();}
 function searchAddress(){
   clearTimeout(searchTimer);
   const q=document.getElementById('addressInput').value.trim();
   if(q.length<3){document.getElementById('searchResults').innerHTML='';return;}
   searchTimer=setTimeout(async()=>{
     try{
-      const r=await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=5&addressdetails=1`,{headers:{'Accept-Language':'pt-BR'}});
+      const r=await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=5`,{headers:{'Accept-Language':'pt-BR'}});
       const data=await r.json();
       const res=document.getElementById('searchResults');
       if(!data.length){res.innerHTML='<div class="sr-item" style="color:var(--text3)">Nenhum resultado</div>';return;}
-      res.innerHTML=data.map(d=>`<div class="sr-item" onclick="goToAddress(${d.lat},${d.lon},'${(d.display_name||'').replace(/'/g,"\\'")}')"><b>${d.name||d.display_name.split(',')[0]}</b><br><span style="font-size:10px;color:var(--text3)">${d.display_name}</span></div>`).join('');
-    }catch{showToast('⚠️ Erro na busca');}
+      res.innerHTML=data.map(d=>`<div class="sr-item" onclick="goToAddress(${d.lat},${d.lon},'${(d.display_name||'').replace(/'/g,"\\'")}')"><b>${d.name||d.display_name.split(',')[0]}</b><br><span style="font-size:10px;color:var(--text3)">${d.display_name.substring(0,60)}</span></div>`).join('');
+    }catch{}
   },500);
 }
-
-function goToAddress(lat,lon,name){
-  map.flyTo([lat,lon],16,{duration:1});
-  document.getElementById('searchResults').innerHTML='';
-  document.getElementById('addressInput').value=name.split(',')[0];
-  L.popup().setLatLng([lat,lon]).setContent(`📍 ${name.split(',')[0]}`).openOn(map);
-  toggleAddressSearch();
-}
+function goToAddress(lat,lon,name){map.flyTo([lat,lon],16,{duration:1});document.getElementById('searchResults').innerHTML='';document.getElementById('addressInput').value=name.split(',')[0];toggleSearch();}
 
 // ════════════════════════════════════════
 //  GPS
 // ════════════════════════════════════════
 function startGPS(){
-  if(!navigator.geolocation){setStatus('GPS não suportado','err');hideGPSBanner();return;}
-  if(navigator.permissions){
-    navigator.permissions.query({name:'geolocation'}).then(r=>{
-      if(r.state==='denied'){setStatus('GPS bloqueado','err');showGPSBanner('📍 Permissão negada. Vá em Configurações → Privacidade → Localização → Permitir para este site.');return;}
-      doGPS();
-    }).catch(doGPS);
-  } else doGPS();
+  if(!navigator.geolocation){setStatus('GPS não suportado','err');return;}
+  if(navigator.permissions){navigator.permissions.query({name:'geolocation'}).then(r=>{if(r.state==='denied'){setStatus('GPS bloqueado','err');showGPSBanner('Vá em Configurações → Localização → Permitir para este site.');return;}doGPS();}).catch(doGPS);}
+  else doGPS();
 }
-
 function doGPS(){
   setStatus('Aguardando GPS...','warn');
   navigator.geolocation.getCurrentPosition(p=>{onPos(p);navigator.geolocation.watchPosition(onPos,onGPSErr,{enableHighAccuracy:true,maximumAge:3000,timeout:15000});},onGPSErr,{enableHighAccuracy:true,maximumAge:0,timeout:15000});
 }
-
 function onPos(p){
   const lat=p.coords.latitude,lng=p.coords.longitude,acc=Math.round(p.coords.accuracy);
   userPos={lat,lng};
   hideGPSBanner();
-  setStatus(acc<20?`GPS preciso ±${acc}m`:acc<80?`GPS ±${acc}m`:`GPS impreciso ±${acc}m`,'on');
+  setStatus(acc<20?`GPS preciso ±${acc}m`:`GPS ±${acc}m`,'on');
   if(!userMarker){
-    userMarker=L.circleMarker([lat,lng],{radius:10,fillColor:'#4f9cf9',color:'#fff',weight:3,fillOpacity:.95}).addTo(map).bindPopup('📍 Você está aqui');
+    userMarker=L.circleMarker([lat,lng],{radius:10,fillColor:'#4f9cf9',color:'#fff',weight:3,fillOpacity:.95}).addTo(map).bindPopup('📍 Você');
     accCircle=L.circle([lat,lng],{radius:acc,color:'#4f9cf9',fillOpacity:.05,weight:1}).addTo(map);
     map.setView([lat,lng],17);
-  } else { userMarker.setLatLng([lat,lng]); if(accCircle)accCircle.setLatLng([lat,lng]).setRadius(acc); }
+  } else {userMarker.setLatLng([lat,lng]);if(accCircle)accCircle.setLatLng([lat,lng]).setRadius(acc);}
   document.getElementById('fCoords').textContent=`📍 ${lat.toFixed(6)}, ${lng.toFixed(6)}`;
-  checkProximity(); drawRadar();
+  checkProximity();drawRadar();
+  if(Notification.permission==='default')Notification.requestPermission();
 }
-
-function onGPSErr(e){
-  const msgs={1:'📍 Permissão negada. Ative a localização nas configurações do navegador.',2:'📡 GPS indisponível. Verifique se o GPS do celular está ativado.',3:'⏱️ GPS demorou demais. Tente ao ar livre.'};
-  showGPSBanner(msgs[e.code]||'⚠️ Erro de localização.');
-  setStatus('GPS falhou','err');
-  if(!userPos)map.setView([-15.78,-47.93],13);
-}
-
-function showGPSBanner(msg){
-  const b=document.getElementById('gpsBanner');
-  b.innerHTML=`<div style="font-family:'Syne',sans-serif;font-weight:700;color:var(--gold);margin-bottom:6px">⚠️ Localização</div><div style="font-size:13px;line-height:1.6">${msg}</div><div style="display:flex;gap:7px;margin-top:10px"><button onclick="doGPS();hideGPSBanner()" style="flex:1;padding:9px;border-radius:9px;background:var(--accent);border:none;color:#fff;font-family:'Syne',sans-serif;font-size:13px;font-weight:700;cursor:pointer">🔄 Tentar novamente</button><button onclick="hideGPSBanner()" style="padding:9px 13px;border-radius:9px;background:var(--surface2);border:1px solid var(--border2);color:var(--text2);font-size:13px;cursor:pointer">✕</button></div>`;
-  b.classList.add('show');
-}
+function onGPSErr(e){const m={1:'Permissão negada — ative nas configurações.',2:'GPS indisponível — verifique se está ativado.',3:'GPS timeout — vá ao ar livre.'};showGPSBanner(m[e.code]||'Erro de localização');setStatus('GPS falhou','err');if(!userPos)map.setView([-15.78,-47.93],13);}
+function showGPSBanner(msg){const b=document.getElementById('gpsBanner');b.innerHTML=`<div style="font-family:'Syne',sans-serif;font-weight:700;color:var(--gold);margin-bottom:6px">⚠️ Localização</div><div style="font-size:13px">${msg}</div><div style="display:flex;gap:7px;margin-top:10px"><button onclick="doGPS();hideGPSBanner()" style="flex:1;padding:9px;border-radius:9px;background:var(--accent);border:none;color:#fff;font-family:'Syne',sans-serif;font-size:13px;font-weight:700;cursor:pointer">🔄 Tentar</button><button onclick="hideGPSBanner()" style="padding:9px 13px;border-radius:9px;background:var(--surface2);border:1px solid var(--border2);color:var(--text2);font-size:13px;cursor:pointer">✕</button></div>`;b.classList.add('show');}
 function hideGPSBanner(){document.getElementById('gpsBanner').classList.remove('show');}
-
-function centerOnMe(){
-  if(userPos)map.flyTo([userPos.lat,userPos.lng],18,{duration:1});
-  else{showToast('GPS não disponível');doGPS();}
-}
-
-// ════════════════════════════════════════
-//  REAL-TIME DISTANCE UPDATER
-// ════════════════════════════════════════
-function startDistanceUpdater(){
-  distInterval=setInterval(()=>{
-    if(!userPos||!currentDetailId) return;
-    const m=memories.find(x=>x.id===currentDetailId);
-    if(!m) return;
-    const d=haversine(userPos.lat,userPos.lng,m.lat,m.lng);
-    const bar=document.getElementById('distBar');
-    bar.classList.add('show');
-    document.getElementById('distTxt').textContent=`até "${m.title}": ${d<1000?Math.round(d)+'m':(d/1000).toFixed(2)+'km'}`;
-  },3000);
-}
+function centerOnMe(){if(userPos)map.flyTo([userPos.lat,userPos.lng],18,{duration:1});else{showToast('GPS indisponível');doGPS();}}
 
 // ════════════════════════════════════════
 //  MARKERS
 // ════════════════════════════════════════
-function renderAllMarkers(){memories.forEach(m=>addMarker(m));}
-
 function addMarker(m){
   const color=COLORS[m.cat]||'#4f9cf9', emoji=m.cat?.split(' ')[0]||'📍';
-  const star=m.starred?'<span style="position:absolute;top:-4px;right:-4px;font-size:10px">⭐</span>':'';
-  const html=`<div style="position:relative;width:36px;height:36px;background:${color};border-radius:50% 50% 50% 0;transform:rotate(-45deg);display:flex;align-items:center;justify-content:center;border:2.5px solid rgba(255,255,255,.6);box-shadow:0 4px 12px ${color}88"><span style="transform:rotate(45deg);font-size:15px">${emoji}</span>${star}</div>`;
+  const isPriv=m.visibility==='private';
+  const isMine=m.authorId===currentUser?.id;
+  const lock=isPriv?'<span style="position:absolute;bottom:-2px;right:-2px;font-size:9px;filter:drop-shadow(0 0 3px gold)">🔒</span>':'';
+  const starMark=starred.has(m.id)?'<span style="position:absolute;top:-4px;right:-4px;font-size:9px">⭐</span>':'';
+  const shadow=isPriv?`drop-shadow(0 0 6px ${color})`:`drop-shadow(0 4px 6px ${color}66)`;
+  const html=`<div style="position:relative;width:36px;height:36px;background:${color};border-radius:50% 50% 50% 0;transform:rotate(-45deg);display:flex;align-items:center;justify-content:center;border:2.5px solid ${isPriv?'gold':'rgba(255,255,255,.6)'};filter:${shadow}"><span style="transform:rotate(45deg);font-size:15px">${emoji}</span>${lock}${starMark}</div>`;
   const icon=L.divIcon({className:'',html,iconSize:[36,36],iconAnchor:[18,36],popupAnchor:[0,-38]});
   if(markerMap[m.id])map.removeLayer(markerMap[m.id]);
-  markerMap[m.id]=L.marker([m.lat,m.lng],{icon}).addTo(map).on('click',()=>openDetail(m.id));
+  const mk=L.marker([m.lat,m.lng],{icon}).addTo(map).on('click',()=>openDetail(m.id));
+  markerMap[m.id]=mk;
+  if(!markersVisible)map.removeLayer(mk);
 }
 
 // ════════════════════════════════════════
-//  FOLDERS
+//  IMAGE COMPRESSION (fit Firestore 1MB)
 // ════════════════════════════════════════
-function loadFolders(){try{folders=JSON.parse(localStorage.getItem(FK)||'[]');}catch{folders=[];}}
-function saveFolders(){localStorage.setItem(FK,JSON.stringify(folders));updateCounts();}
-
-function promptNewFolder(){
-  const name=prompt('Nome da pasta:','');
-  if(!name||!name.trim())return;
-  const emoji=prompt('Emoji da pasta (ex: 🏠):','📁')||'📁';
-  folders.push({id:Date.now().toString(),name:name.trim(),emoji});
-  saveFolders(); buildFolderPickRow(); renderFolderList();
-  showToast(`📁 Pasta "${name}" criada!`);
-}
-
-function buildFolderPickRow(){
-  const row=document.getElementById('folderPickRow');
-  row.innerHTML='<div class="fchip'+(selFolderV===null?' sel':'')+'" onclick="selFolder(this,null)">📌 Sem pasta</div>'+folders.map(f=>`<div class="fchip${selFolderV===f.id?' sel':''}" onclick="selFolder(this,'${f.id}')">${f.emoji} ${f.name}</div>`).join('');
-}
-
-function selFolder(el,id){
-  document.querySelectorAll('.fchip').forEach(c=>c.classList.remove('sel'));
-  el.classList.add('sel'); selFolderV=id;
-}
-
-function renderFolderList(){
-  const body=document.getElementById('folderList');
-  if(!folders.length){body.innerHTML='<div class="empty"><div class="ei">📁</div><p>Nenhuma pasta ainda.<br>Crie uma para organizar suas memórias.</p></div>';return;}
-  body.innerHTML=folders.map(f=>{
-    const count=memories.filter(m=>m.folderId===f.id).length;
-    return `<div class="folder-card" onclick="openFolder('${f.id}')"><div class="folder-icon">${f.emoji}</div><div class="folder-info"><div class="folder-name">${f.name}</div><div class="folder-count">${count} memória${count!==1?'s':''}</div></div><button onclick="event.stopPropagation();deleteFolder('${f.id}')" style="background:none;border:none;font-size:18px;cursor:pointer;color:var(--text3)">🗑️</button></div>`;
-  }).join('');
-}
-
-function openFolder(id){
-  const f=folders.find(x=>x.id===id); if(!f)return;
-  const mems=memories.filter(m=>m.folderId===id);
-  document.getElementById('fdTitle').textContent=`${f.emoji} ${f.name}`;
-  const body=document.getElementById('fdBody');
-  if(!mems.length){body.innerHTML='<div class="empty"><div class="ei">📷</div><p>Esta pasta está vazia.</p></div>';closeAllSheets(true);openSheet('folderDetailSheet');return;}
-  body.innerHTML=mems.map(m=>memCardHTML(m)).join('');
-  closeAllSheets(true); openSheet('folderDetailSheet');
-}
-
-function deleteFolder(id){
-  if(!confirm('Apagar pasta? As memórias não serão apagadas.'))return;
-  folders=folders.filter(f=>f.id!==id);
-  memories=memories.map(m=>m.folderId===id?{...m,folderId:null}:m);
-  saveMemories(); saveFolders(); renderFolderList(); showToast('🗑️ Pasta apagada');
+function compressImage(dataURL, maxPx, quality){
+  return new Promise(resolve=>{
+    const img=new Image();
+    img.onload=()=>{
+      let w=img.width,h=img.height;
+      if(w>maxPx||h>maxPx){
+        if(w>h){h=Math.round(h*maxPx/w);w=maxPx;}
+        else{w=Math.round(w*maxPx/h);h=maxPx;}
+      }
+      const c=document.createElement('canvas');
+      c.width=w;c.height=h;
+      c.getContext('2d').drawImage(img,0,0,w,h);
+      resolve(c.toDataURL('image/jpeg',quality));
+    };
+    img.src=dataURL;
+  });
 }
 
 // ════════════════════════════════════════
-//  ADD/EDIT MEMORY
+//  SAVE TO FIRESTORE
 // ════════════════════════════════════════
 function startAdd(){
-  document.getElementById('addTitle').textContent='📍 Nova Memória';
+  if(!currentUser){showToast('⚠️ Faça login primeiro');return;}
+  document.getElementById('addShTitle').textContent='📍 Nova Memória';
   document.getElementById('editId').value='';
   document.getElementById('fTitle').value='';
   document.getElementById('fText').value='';
@@ -849,52 +831,39 @@ function startAdd(){
   document.getElementById('audioPlayback').style.display='none';
   document.getElementById('audioPlayback').src='';
   document.getElementById('recStatus').textContent='Toque para gravar';
-  photoData=null; audioData=null; selCatV='📸 Foto'; selVisV='public'; selFolderV=null;
+  photoData=null; audioData=null; selCatV='📸 Foto'; selVisV='public';
   document.querySelectorAll('.cchip').forEach((c,i)=>c.classList.toggle('sel',i===0));
   document.querySelectorAll('.vbtn').forEach((b,i)=>b.classList.toggle('active',i===0));
-  buildFolderPickRow();
+  updateVisHint();
   openSheet('addSheet');
 }
 
-function editMemory(){
-  const m=memories.find(x=>x.id===currentDetailId); if(!m)return;
-  closeAllSheets(true);
-  document.getElementById('addTitle').textContent='✏️ Editar';
-  document.getElementById('editId').value=m.id;
-  document.getElementById('fTitle').value=m.title;
-  document.getElementById('fText').value=m.text||'';
-  selCatV=m.cat; selVisV=m.visibility||'public'; selFolderV=m.folderId||null;
-  document.querySelectorAll('.cchip').forEach(c=>c.classList.toggle('sel',c.dataset.cat===m.cat));
-  document.querySelectorAll('.vbtn').forEach(b=>b.classList.toggle('active',b.dataset.vis===selVisV));
-  if(m.photo){document.getElementById('photoPreview').src=m.photo;document.getElementById('photoPreview').style.display='block';photoData=m.photo;}
-  if(m.audio){document.getElementById('audioPlayback').src=m.audio;document.getElementById('audioPlayback').style.display='block';audioData=m.audio;}
-  pendingLatLng={lat:m.lat,lng:m.lng};
-  document.getElementById('fCoords').textContent=`📍 ${m.lat.toFixed(6)}, ${m.lng.toFixed(6)}`;
-  buildFolderPickRow(); openSheet('addSheet');
-}
-
 function selCat(el){document.querySelectorAll('.cchip').forEach(c=>c.classList.remove('sel'));el.classList.add('sel');selCatV=el.dataset.cat;}
-function selVis(el){document.querySelectorAll('.vbtn').forEach(b=>b.classList.remove('active'));el.classList.add('active');selVisV=el.dataset.vis;}
+function selVis(el){
+  document.querySelectorAll('.vbtn').forEach(b=>b.classList.remove('active'));
+  el.classList.add('active'); selVisV=el.dataset.vis; updateVisHint();
+}
+function updateVisHint(){
+  const h=document.getElementById('visHint');
+  if(!h)return;
+  if(selVisV==='private') h.textContent='🔒 Privada: só você vê este ponto, mesmo em outro dispositivo com sua conta Google';
+  else h.textContent='🌍 Pública: todos os usuários verão no mapa em tempo real';
+}
 
 function onPhoto(input){
-  const file=input.files[0]; if(!file)return;
-  const img=new Image(), url=URL.createObjectURL(file);
+  const file=input.files[0];if(!file)return;
+  const img=new Image(),url=URL.createObjectURL(file);
   img.onload=()=>{
     const c=document.createElement('canvas');
-    const MAX=900; let w=img.width,h=img.height;
-    if(w>MAX){h=h*MAX/w;w=MAX;} if(h>MAX){w=w*MAX/h;h=MAX;}
+    const MAX=900;let w=img.width,h=img.height;
+    if(w>MAX){h=h*MAX/w;w=MAX;}if(h>MAX){w=w*MAX/h;h=MAX;}
     c.width=w;c.height=h;c.getContext('2d').drawImage(img,0,0,w,h);
     photoData=c.toDataURL('image/jpeg',.82);
-    const prev=document.getElementById('photoPreview');
-    prev.src=photoData; prev.style.display='block';
+    const prev=document.getElementById('photoPreview');prev.src=photoData;prev.style.display='block';
     URL.revokeObjectURL(url);
-  };
-  img.src=url;
+  };img.src=url;
 }
 
-// ════════════════════════════════════════
-//  AUDIO
-// ════════════════════════════════════════
 async function toggleRecord(){
   if(mediaRecorder&&mediaRecorder.state==='recording'){stopRecord();return;}
   try{
@@ -906,201 +875,265 @@ async function toggleRecord(){
       const blob=new Blob(chunks,{type:'audio/webm'});
       const reader=new FileReader();
       reader.onload=e=>{audioData=e.target.result;document.getElementById('audioPlayback').src=audioData;document.getElementById('audioPlayback').style.display='block';};
-      reader.readAsDataURL(blob);
-      stream.getTracks().forEach(t=>t.stop());
+      reader.readAsDataURL(blob);stream.getTracks().forEach(t=>t.stop());
     };
-    mediaRecorder.start(); recSecs=0;
-    document.getElementById('recBtn').textContent='⏹️';
-    document.getElementById('recBtn').classList.add('rec');
-    document.getElementById('recStatus').style.display='none';
-    document.getElementById('recTime').style.display='block';
+    mediaRecorder.start();recSecs=0;
+    document.getElementById('recBtn').textContent='⏹️';document.getElementById('recBtn').classList.add('rec');
+    document.getElementById('recStatus').style.display='none';document.getElementById('recTime').style.display='block';
     recInterval=setInterval(()=>{recSecs++;const m=String(Math.floor(recSecs/60)).padStart(2,'0'),s=String(recSecs%60).padStart(2,'0');document.getElementById('recTime').textContent=`${m}:${s}`;if(recSecs>=120)stopRecord();},1000);
   }catch{showToast('⚠️ Microfone não disponível');}
 }
+function stopRecord(){if(mediaRecorder)mediaRecorder.stop();mediaRecorder=null;clearInterval(recInterval);document.getElementById('recBtn').textContent='🎙️';document.getElementById('recBtn').classList.remove('rec');document.getElementById('recStatus').style.display='block';document.getElementById('recStatus').textContent='✅ Gravado';document.getElementById('recTime').style.display='none';}
 
-function stopRecord(){
-  if(mediaRecorder)mediaRecorder.stop(); mediaRecorder=null;
-  clearInterval(recInterval);
-  document.getElementById('recBtn').textContent='🎙️';
-  document.getElementById('recBtn').classList.remove('rec');
-  document.getElementById('recStatus').style.display='block';
-  document.getElementById('recStatus').textContent='✅ Áudio gravado';
-  document.getElementById('recTime').style.display='none';
-}
-
-// ════════════════════════════════════════
-//  SAVE
-// ════════════════════════════════════════
-function saveMemory(){
+async function saveMemory(){
   const title=document.getElementById('fTitle').value.trim();
   const text=document.getElementById('fText').value.trim();
   const editId=document.getElementById('editId').value;
   if(!title){showToast('⚠️ Digite um título');return;}
   const ll=pendingLatLng||userPos;
   if(!ll){showToast('⚠️ Localização indisponível');return;}
-  const btn=document.getElementById('saveBtn'); btn.disabled=true; btn.textContent='Salvando...';
-  const isEdit=!!editId;
-  const mem={
-    id:editId||Date.now().toString(), title, text,
-    cat:selCatV, visibility:selVisV,
-    folderId:selFolderV,
-    lat:ll.lat??ll.latitude, lng:ll.lng??ll.longitude,
-    photo:photoData, audio:audioData,
-    date:isEdit?(memories.find(m=>m.id===editId)?.date||new Date().toISOString()):new Date().toISOString(),
-    editedAt:isEdit?new Date().toISOString():null,
-    author:currentUser?.name||'Anônimo',
-    authorId:currentUser?.id,
-    starred:isEdit?(memories.find(m=>m.id===editId)?.starred||false):false,
-    comments:isEdit?(memories.find(m=>m.id===editId)?.comments||[]):[],
-  };
-  if(isEdit)memories=memories.map(m=>m.id===editId?mem:m); else memories.push(mem);
-  saveMemories(); addMarker(mem); closeAllSheets();
-  pendingLatLng=null; photoData=null; audioData=null;
-  showToast(isEdit?'✅ Editado!':'✅ Memória salva!');
-  map.flyTo([mem.lat,mem.lng],17,{duration:1});
-  btn.disabled=false; btn.textContent='💾 Salvar Memória';
+  const btn=document.getElementById('saveBtn');btn.disabled=true;btn.textContent='☁️ Salvando...';
+  setSyncing();
+
+  try{
+    const {db,collection,addDoc,updateDoc,doc,serverTimestamp}=window._fb;
+
+    // Compress photo further if too large (Firestore doc limit = 1MB)
+    let photoB64 = null;
+    if(photoData){
+      // Already compressed on capture, but double-check size
+      if(photoData.length > 700000){
+        // Re-compress at lower quality
+        const img=new Image();
+        await new Promise(res=>{img.onload=res;img.src=photoData;});
+        const c=document.createElement('canvas');
+        const MAX=600;let w=img.width,h=img.height;
+        if(w>MAX){h=h*MAX/w;w=MAX;}if(h>MAX){w=w*MAX/h;h=MAX;}
+        c.width=w;c.height=h;c.getContext('2d').drawImage(img,0,0,w,h);
+        photoB64=c.toDataURL('image/jpeg',0.65);
+      } else {
+        photoB64=photoData;
+      }
+    }
+
+    // Audio base64 (webm ~30KB/min — fine for Firestore)
+    const audioB64=audioData||null;
+
+    const memData={
+      title, text, cat:selCatV, visibility:selVisV,
+      lat:ll.lat??ll.latitude, lng:ll.lng??ll.longitude,
+      photoB64, audioB64,
+      authorId:currentUser.id,
+      authorName:currentUser.name,
+      authorPhoto:currentUser.photo||null,
+      comments:[],
+      updatedAt:serverTimestamp(),
+    };
+
+    if(editId){
+      await updateDoc(doc(db,'memories',editId),{...memData});
+      showToast('✅ Editado!');
+    } else {
+      memData.createdAt=serverTimestamp();
+      await addDoc(collection(db,'memories'),memData);
+      showToast('✅ Salvo na nuvem!');
+    }
+
+    closeAllSheets();pendingLatLng=null;photoData=null;audioData=null;
+    if(ll)map.flyTo([ll.lat,ll.lng],17,{duration:1});
+  } catch(e){
+    if(e.message&&e.message.includes('exceeds')){
+      showToast('⚠️ Foto muito grande! Tente uma imagem menor.');
+    } else {
+      showToast('⚠️ Erro: '+e.message);
+    }
+    console.error(e);
+  } finally {
+    btn.disabled=false;btn.textContent='☁️ Salvar na Nuvem';setSynced();
+  }
 }
 
 // ════════════════════════════════════════
 //  DETAIL
 // ════════════════════════════════════════
 function openDetail(id){
-  const m=memories.find(x=>x.id===id); if(!m)return;
+  const m=memories.find(x=>x.id===id);if(!m)return;
   currentDetailId=id;
+  const isMine=m.authorId===currentUser?.id;
   document.getElementById('dtTitle').textContent=m.title;
   document.getElementById('dtText').textContent=m.text||'(sem texto)';
-  document.getElementById('dtDate').textContent=new Date(m.date).toLocaleString('pt-BR')+(m.editedAt?' (editado)':'');
-  const img=document.getElementById('detailImg'); img.style.display=m.photo?'block':'none'; if(m.photo)img.src=m.photo;
-  const aw=document.getElementById('dtAudioWrap'); aw.style.display=m.audio?'block':'none'; if(m.audio)document.getElementById('dtAudio').src=m.audio;
+  document.getElementById('dtDate').textContent=m.createdAt?.toDate?.()?.toLocaleString('pt-BR')||m.createdAt||'';
+  document.getElementById('dtAuthor').textContent=(m.authorName||'Anônimo')+(isMine?' (você)':'');
+  const img=document.getElementById('detailImg');
+  const src=m.photoB64||m.photo;
+  img.style.display=src?'block':'none';if(src)img.src=src;
+  const aw=document.getElementById('dtAudioWrap');
+  const asrc=m.audioB64||m.audio;
+  aw.style.display=asrc?'block':'none';if(asrc)document.getElementById('dtAudio').src=asrc;
   const color=COLORS[m.cat]||'#4f9cf9';
-  const visIcon=m.visibility==='private'?'🔒':m.visibility==='friends'?'👥':'🌍';
-  const folder=folders.find(f=>f.id===m.folderId);
+  const visIcon=m.visibility==='private'?'🔒 Privada':'🌍 Pública';
   document.getElementById('dtBadges').innerHTML=
     `<span class="cbadge" style="background:${color}22;color:${color}">${m.cat}</span>`+
-    `<span class="priv-b">${visIcon}</span>`+
-    (folder?`<span class="priv-b" style="color:var(--purple);background:rgba(167,139,250,.12)">${folder.emoji} ${folder.name}</span>`:'')+
-    (m.audio?'<span class="priv-b">🎵</span>':'')+
-    (m.starred?'<span class="priv-b" style="color:var(--gold);background:rgba(251,191,36,.12)">⭐</span>':'');
-  document.getElementById('dtCoords').textContent=`${m.lat.toFixed(6)}, ${m.lng.toFixed(6)}`;
+    `<span class="priv-b" style="${m.visibility==='private'?'':'background:rgba(52,211,153,.1);color:var(--green)'}">${visIcon}</span>`+
+    `<span class="author-b">${m.authorName||'Anônimo'}</span>`+
+    (asrc?'<span class="priv-b">🎵</span>':'');
+  document.getElementById('dtCoords').textContent=`${m.lat?.toFixed(6)}, ${m.lng?.toFixed(6)}`;
   if(userPos){const d=haversine(userPos.lat,userPos.lng,m.lat,m.lng);document.getElementById('dtDist').textContent=d<1000?`${Math.round(d)}m`:`${(d/1000).toFixed(1)}km`;}
-  const starBtn=document.getElementById('starBtn');
-  starBtn.className='btn-s btn-star'+(m.starred?' starred':'');
-  starBtn.innerHTML=m.starred?'⭐ Favoritado':'☆ Favoritar';
   // QR
-  const qd=document.getElementById('qrDiv'); qd.innerHTML='';
+  const qd=document.getElementById('qrDiv');qd.innerHTML='';
   const url=`${location.href.split('?')[0]}?m=${m.id}&lat=${m.lat}&lng=${m.lng}`;
   try{new QRCode(qd,{text:url,width:148,height:148,colorDark:'#0a0f1e',colorLight:'#ffffff',correctLevel:QRCode.CorrectLevel.M});}catch(e){}
-  document.getElementById('qrLbl').textContent=`ID: ${m.id.slice(-8)}`;
+  document.getElementById('qrLbl').textContent=`ID: ${id.slice(-8)}`;
+  // Owner vs guest buttons
+  document.getElementById('ownerBtns').style.display=isMine?'flex':'none';
+  document.getElementById('nonOwnerBtns').style.display=isMine?'none':'flex';
+  const starBtn=document.getElementById('starBtn');
+  const starBtnG=document.getElementById('starBtnGuest');
+  const isStarred=starred.has(id);
+  if(starBtn){starBtn.className='btn-s btn-star'+(isStarred?' on':'');starBtn.innerHTML=isStarred?'⭐ Favoritado':'☆ Favoritar';}
+  if(starBtnG){starBtnG.className='btn-s btn-star'+(isStarred?' on':'');starBtnG.innerHTML=isStarred?'⭐ Favoritado':'☆ Favoritar';}
   renderComments(m);
-  closeAllSheets(true); openSheet('detailSheet');
+  closeAllSheets(true);openSheet('detailSheet');
 }
 
-function deleteMemory(){
-  if(!confirm('Apagar?'))return;
-  memories=memories.filter(m=>m.id!==currentDetailId);
-  saveMemories(); if(markerMap[currentDetailId]){map.removeLayer(markerMap[currentDetailId]);delete markerMap[currentDetailId];}
-  currentDetailId=null; document.getElementById('distBar').classList.remove('show');
-  closeAllSheets(); showToast('🗑️ Apagada');
+async function deleteMemory(){
+  if(!confirm('Apagar esta memória?'))return;
+  const {db,doc,deleteDoc}=window._fb;
+  setSyncing();
+  try{
+    await deleteDoc(doc(db,'memories',currentDetailId));
+    closeAllSheets();showToast('🗑️ Apagada');setSynced();
+  }catch(e){showToast('⚠️ '+e.message);setSynced();}
+}
+
+function editMemory(){
+  const m=memories.find(x=>x.id===currentDetailId);if(!m)return;
+  closeAllSheets(true);
+  document.getElementById('addShTitle').textContent='✏️ Editar';
+  document.getElementById('editId').value=m.id;
+  document.getElementById('fTitle').value=m.title;
+  document.getElementById('fText').value=m.text||'';
+  selCatV=m.cat;selVisV=m.visibility||'public';
+  document.querySelectorAll('.cchip').forEach(c=>c.classList.toggle('sel',c.dataset.cat===m.cat));
+  document.querySelectorAll('.vbtn').forEach(b=>b.classList.toggle('active',b.dataset.vis===selVisV));
+  const src=m.photoB64||m.photo;
+  if(src){document.getElementById('photoPreview').src=src;document.getElementById('photoPreview').style.display='block';photoData=src;}
+  const asrc=m.audioB64||m.audio;
+  if(asrc){document.getElementById('audioPlayback').src=asrc;document.getElementById('audioPlayback').style.display='block';audioData=asrc;}
+  pendingLatLng={lat:m.lat,lng:m.lng};
+  document.getElementById('fCoords').textContent=`📍 ${m.lat.toFixed(6)}, ${m.lng.toFixed(6)}`;
+  updateVisHint();openSheet('addSheet');
 }
 
 function toggleStar(){
-  const m=memories.find(x=>x.id===currentDetailId); if(!m)return;
-  m.starred=!m.starred; saveMemories(); addMarker(m); openDetail(currentDetailId);
-  showToast(m.starred?'⭐ Favoritado!':'☆ Removido dos favoritos');
+  if(starred.has(currentDetailId))starred.delete(currentDetailId);
+  else starred.add(currentDetailId);
+  localStorage.setItem(SK_STAR,JSON.stringify([...starred]));
+  const m=memories.find(x=>x.id===currentDetailId);
+  if(m){addMarker(m);openDetail(currentDetailId);}
+  showToast(starred.has(currentDetailId)?'⭐ Favoritado!':'☆ Removido');
 }
 
 function navToMemory(){const m=memories.find(x=>x.id===currentDetailId);if(m)window.open(`https://www.google.com/maps/dir/?api=1&destination=${m.lat},${m.lng}`,'_blank');}
-
 function shareMemory(){
-  const m=memories.find(x=>x.id===currentDetailId); if(!m)return;
+  const m=memories.find(x=>x.id===currentDetailId);if(!m)return;
   const url=`${location.href.split('?')[0]}?m=${m.id}&lat=${m.lat}&lng=${m.lng}`;
   if(navigator.share)navigator.share({title:m.title,text:m.text||'',url});
-  else navigator.clipboard.writeText(url).then(()=>showToast('🔗 Link copiado!'));
+  else navigator.clipboard.writeText(url).then(()=>showToast('🔗 Copiado!'));
 }
-
 function shareWhatsapp(){
-  const m=memories.find(x=>x.id===currentDetailId); if(!m)return;
+  const m=memories.find(x=>x.id===currentDetailId);if(!m)return;
   const url=`${location.href.split('?')[0]}?m=${m.id}&lat=${m.lat}&lng=${m.lng}`;
-  const text=encodeURIComponent(`📍 *${m.title}*\n${m.text||''}\n\n🌍 Ver no mapa: ${url}`);
-  window.open(`https://wa.me/?text=${text}`,'_blank');
+  window.open(`https://wa.me/?text=${encodeURIComponent(`📍 *${m.title}*\n${m.text||''}\n🌍 ${url}`)}`,'_blank');
 }
 
 // ════════════════════════════════════════
 //  COMMENTS
 // ════════════════════════════════════════
 function renderComments(m){
-  const list=document.getElementById('commentsList');
-  const comments=m.comments||[];
-  if(!comments.length){list.innerHTML='<div style="font-size:12px;color:var(--text3);padding:8px 0">Seja o primeiro a comentar!</div>';return;}
-  list.innerHTML=comments.map(c=>`<div class="comment-item"><div class="comment-author">${c.author}</div><div class="comment-text">${c.text}</div><div class="comment-date">${new Date(c.date).toLocaleString('pt-BR')}</div></div>`).join('');
+  const cmts=m.comments||[];
+  document.getElementById('cmtCount').textContent=cmts.length?`(${cmts.length})`:'';
+  const list=document.getElementById('cmtList');
+  if(!cmts.length){list.innerHTML='<div style="font-size:12px;color:var(--text3);padding:6px 0">Seja o primeiro a comentar!</div>';return;}
+  list.innerHTML=cmts.slice(-20).reverse().map(c=>`<div class="cmt-item"><div class="cmt-head"><div class="cmt-avatar">${(c.author||'?')[0].toUpperCase()}</div><span class="cmt-author">${c.author||'Anônimo'}</span><span class="cmt-date">${c.date?new Date(c.date).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):''}</span></div><div class="cmt-text">${c.text}</div></div>`).join('');
 }
 
-function addComment(){
-  const input=document.getElementById('commentInput');
-  const text=input.value.trim(); if(!text)return;
-  const m=memories.find(x=>x.id===currentDetailId); if(!m)return;
-  if(!m.comments)m.comments=[];
-  m.comments.push({id:Date.now().toString(),author:currentUser?.name||'Visitante',text,date:new Date().toISOString()});
-  saveMemories(); renderComments(m); input.value=''; showToast('💬 Comentário adicionado!');
+async function addComment(){
+  const input=document.getElementById('cmtInput');
+  const text=input.value.trim();if(!text)return;
+  const {db,doc,updateDoc,arrayUnion}=window._fb;
+  const cmt={id:Date.now().toString(),author:currentUser?.name||'Visitante',authorId:currentUser?.id,text,date:new Date().toISOString()};
+  input.value='';setSyncing();
+  try{
+    await updateDoc(doc(db,'memories',currentDetailId),{comments:arrayUnion(cmt)});
+    showToast('💬 Comentário adicionado!');setSynced();
+  }catch(e){showToast('⚠️ '+e.message);setSynced();}
 }
 
 // ════════════════════════════════════════
 //  LIST
 // ════════════════════════════════════════
 function renderList(){
-  const q=(document.getElementById('listSearch').value||'').toLowerCase();
+  const q=(document.getElementById('listSearch')?.value||'').toLowerCase();
   let list=memories;
-  if(listFilter==='public')list=list.filter(m=>!m.visibility||m.visibility==='public');
-  if(listFilter==='private')list=list.filter(m=>m.visibility==='private');
-  if(listFilter==='starred')list=list.filter(m=>m.starred);
-  if(q)list=list.filter(m=>m.title.toLowerCase().includes(q)||(m.text||'').toLowerCase().includes(q)||m.cat.toLowerCase().includes(q));
-  list=[...list].sort((a,b)=>new Date(b.date)-new Date(a.date));
+  if(listFilter==='public')list=list.filter(m=>m.visibility==='public');
+  if(listFilter==='mine')list=list.filter(m=>m.authorId===currentUser?.id);
+  if(listFilter==='starred')list=list.filter(m=>starred.has(m.id));
+  if(q)list=list.filter(m=>m.title?.toLowerCase().includes(q)||(m.text||'').toLowerCase().includes(q)||m.cat?.toLowerCase().includes(q));
+  list=[...list].sort((a,b)=>{
+    const ta=a.createdAt?.toDate?.()?.getTime()||new Date(a.createdAt||0).getTime();
+    const tb=b.createdAt?.toDate?.()?.getTime()||new Date(b.createdAt||0).getTime();
+    return tb-ta;
+  });
   const body=document.getElementById('listBody');
   if(!list.length){body.innerHTML='<div class="empty"><div class="ei">🗺️</div><p>Nenhuma memória encontrada.</p></div>';return;}
-  body.innerHTML=list.map(m=>memCardHTML(m)).join('');
+  body.innerHTML=list.map(m=>{
+    const color=COLORS[m.cat]||'#4f9cf9';
+    const d=userPos?haversine(userPos.lat,userPos.lng,m.lat,m.lng):null;
+    const dist=d!=null?(d<1000?`${Math.round(d)}m`:`${(d/1000).toFixed(1)}km`):'';
+    const src=m.photoB64||m.photo;
+    const isStar=starred.has(m.id);
+    return `<div class="mcard${isStar?' starred':''}" onclick="flyAndOpen('${m.id}')">
+      ${src?`<img class="mcard-img" src="${src}" loading="lazy">`:''}
+      <div class="mcard-body">
+        <div class="mcard-title">${isStar?'⭐ ':''}${m.title}${(m.audioB64||m.audio)?' 🎵':''}</div>
+        <div class="mcard-meta">
+          <span class="cbadge" style="background:${color}22;color:${color}">${m.cat}</span>
+          ${m.visibility==='private'?'<span class="priv-b">🔒</span>':''}
+          <span class="author-b">👤 ${m.authorName||'?'}</span>
+          ${dist?`<span>📍 ${dist}</span>`:''}
+          ${(m.comments||[]).length?`<span>💬 ${m.comments.length}</span>`:''}
+        </div>
+      </div></div>`;
+  }).join('');
 }
-
-function memCardHTML(m){
-  const color=COLORS[m.cat]||'#4f9cf9';
-  const d=userPos?haversine(userPos.lat,userPos.lng,m.lat,m.lng):null;
-  const dist=d!=null?(d<1000?`${Math.round(d)}m`:`${(d/1000).toFixed(1)}km`):'';
-  return `<div class="mcard${m.starred?' starred-card':''}" onclick="flyAndOpen('${m.id}')" style="margin-bottom:9px">
-    ${m.photo?`<img class="mcard-img" src="${m.photo}" loading="lazy">`:''}
-    <div class="mcard-body">
-      <div class="mcard-title">${m.starred?'⭐ ':''}${m.title}${m.audio?' 🎵':''}</div>
-      <div class="mcard-meta"><span class="cbadge" style="background:${color}22;color:${color}">${m.cat}</span>${m.visibility==='private'?'<span class="priv-b">🔒</span>':''}${dist?`<span>📍 ${dist}</span>`:''}${(m.comments||[]).length?`<span>💬 ${m.comments.length}</span>`:''}</div>
-    </div></div>`;
-}
-
-function setListFilter(btn){document.querySelectorAll('#listSeg .seg-t').forEach(t=>t.classList.remove('active'));btn.classList.add('active');listFilter=btn.dataset.f;renderList();}
+function setLF(btn){document.querySelectorAll('#listSheet .seg-t').forEach(t=>t.classList.remove('active'));btn.classList.add('active');listFilter=btn.dataset.f;renderList();}
 function flyAndOpen(id){const m=memories.find(x=>x.id===id);if(!m)return;closeAllSheets();map.flyTo([m.lat,m.lng],17,{duration:.8});setTimeout(()=>openDetail(id),900);}
+function updateCount(){document.getElementById('memCount').textContent=memories.length;}
 
 // ════════════════════════════════════════
 //  STATS
 // ════════════════════════════════════════
 function buildStats(){
   const total=memories.length;
-  const pub=memories.filter(m=>!m.visibility||m.visibility==='public').length;
+  const pub=memories.filter(m=>m.visibility==='public').length;
   const priv=memories.filter(m=>m.visibility==='private').length;
-  const starred=memories.filter(m=>m.starred).length;
-  const withPhoto=memories.filter(m=>m.photo).length;
-  const withAudio=memories.filter(m=>m.audio).length;
-  const withComment=memories.filter(m=>(m.comments||[]).length>0).length;
+  const mine=memories.filter(m=>m.authorId===currentUser?.id).length;
+  const withPhoto=memories.filter(m=>m.photoB64||m.photo).length;
+  const withAudio=memories.filter(m=>m.audioB64||m.audio).length;
   const catC={};memories.forEach(m=>{catC[m.cat]=(catC[m.cat]||0)+1;});
-  const folderC=folders.map(f=>({...f,count:memories.filter(m=>m.folderId===f.id).length}));
-  const body=document.getElementById('statsBody');
-  body.innerHTML=`
+  const uniqueAuthors=new Set(memories.map(m=>m.authorId)).size;
+  document.getElementById('statsBody').innerHTML=`
     <div class="stats-grid">
-      <div class="stat-card"><div class="stat-val" style="color:var(--accent)">${total}</div><div class="stat-lbl">Total</div></div>
-      <div class="stat-card"><div class="stat-val" style="color:var(--gold)">${starred}</div><div class="stat-lbl">Favoritas</div></div>
+      <div class="stat-card"><div class="stat-val" style="color:var(--accent)">${total}</div><div class="stat-lbl">Total na Nuvem</div></div>
       <div class="stat-card"><div class="stat-val" style="color:var(--green)">${pub}</div><div class="stat-lbl">Públicas</div></div>
+      <div class="stat-card"><div class="stat-val" style="color:var(--gold)">${priv}</div><div class="stat-lbl">Privadas (minhas)</div></div>
+      <div class="stat-card"><div class="stat-val" style="color:var(--purple)">${mine}</div><div class="stat-lbl">Criadas por mim</div></div>
       <div class="stat-card"><div class="stat-val" style="color:var(--pink)">${withPhoto}</div><div class="stat-lbl">Com Foto</div></div>
-      <div class="stat-card"><div class="stat-val" style="color:var(--purple)">${withAudio}</div><div class="stat-lbl">Com Áudio</div></div>
-      <div class="stat-card"><div class="stat-val" style="color:var(--orange)">${withComment}</div><div class="stat-lbl">Comentadas</div></div>
+      <div class="stat-card"><div class="stat-val" style="color:var(--orange)">${uniqueAuthors}</div><div class="stat-lbl">Usuários ativos</div></div>
     </div>
-    <div class="fl">Categorias</div>
-    ${Object.entries(catC).map(([cat,n])=>{const color=COLORS[cat]||'#4f9cf9';const pct=total?Math.round(n/total*100):0;return `<div style="display:flex;align-items:center;gap:9px;font-size:12px"><span style="min-width:80px">${cat}</span><div style="flex:1;height:5px;background:var(--surface2);border-radius:3px;overflow:hidden"><div style="height:100%;width:${pct}%;background:${color};transition:width .6s;border-radius:3px"></div></div><span style="color:var(--text3);min-width:22px;text-align:right">${n}</span></div>`;}).join('')}
-    ${folderC.length?`<div class="fl">Pastas</div>${folderC.map(f=>`<div style="display:flex;align-items:center;gap:8px;font-size:13px;background:var(--surface2);border-radius:10px;padding:9px 11px"><span style="font-size:20px">${f.emoji}</span><span style="flex:1">${f.name}</span><span style="color:var(--text3)">${f.count}</span></div>`).join('')}`:''}
+    <div class="fl" style="margin-top:4px">Por categoria</div>
+    ${Object.entries(catC).map(([cat,n])=>{const c=COLORS[cat]||'#4f9cf9';const pct=total?Math.round(n/total*100):0;return `<div style="display:flex;align-items:center;gap:9px;font-size:12px"><span style="min-width:80px">${cat}</span><div style="flex:1;height:5px;background:var(--surface2);border-radius:3px;overflow:hidden"><div style="height:100%;width:${pct}%;background:${c};border-radius:3px"></div></div><span style="color:var(--text3);min-width:22px;text-align:right">${n}</span></div>`;}).join('')}
   `;
 }
 
@@ -1108,14 +1141,14 @@ function buildStats(){
 //  AR
 // ════════════════════════════════════════
 async function openARMode(){
-  const m=memories.find(x=>x.id===currentDetailId); if(!m)return;
+  const m=memories.find(x=>x.id===currentDetailId);if(!m)return;
   try{
     arStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}},audio:false});
     document.getElementById('arVideo').srcObject=arStream;
     document.getElementById('arOverlay').classList.add('show');
     document.getElementById('arTitle').textContent=m.title;
     const d=userPos?haversine(userPos.lat,userPos.lng,m.lat,m.lng):0;
-    document.getElementById('arDist').textContent=d?`${Math.round(d)} metros de distância`:'';
+    document.getElementById('arDist').textContent=d?`${Math.round(d)}m de distância`:'';
     document.getElementById('arInfo').style.display='block';
     closeAllSheets();
   }catch{showToast('⚠️ Câmera não disponível');}
@@ -1134,47 +1167,57 @@ function checkProximity(){
     document.getElementById('proxTitle').textContent=`"${closest.title}"`;
     document.getElementById('proxSub').textContent=`${Math.round(minD)}m — toque para ver`;
     const b=document.getElementById('proxBanner');b.classList.add('show');setTimeout(()=>b.classList.remove('show'),9000);
-    // Browser notification
-    if(Notification.permission==='granted'){new Notification('📍 GeoMemory',{body:`Você está perto de "${closest.title}" (${Math.round(minD)}m)`,icon:'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">📍</text></svg>'});}
+    if(Notification.permission==='granted')new Notification('📍 GeoMemory',{body:`Perto de "${closest.title}" (${Math.round(minD)}m)`});
   }
 }
 function onProxTap(){hideProx();if(nearbyId)openDetail(nearbyId);}
 function hideProx(){document.getElementById('proxBanner').classList.remove('show');}
-
-// Request notification permission on first position
-let notifRequested=false;
-function maybeRequestNotif(){
-  if(notifRequested)return; notifRequested=true;
-  if('Notification' in window&&Notification.permission==='default')Notification.requestPermission();
-}
 
 // ════════════════════════════════════════
 //  RADAR
 // ════════════════════════════════════════
 function drawRadar(){
   const c=document.getElementById('radarCanvas'),ctx=c.getContext('2d');
-  const W=88,cx=44,cy=44,R=38;
+  const W=86,cx=43,cy=43,R=37;
   ctx.clearRect(0,0,W,W);
-  [R*.3,R*.6,R].forEach(r=>{ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);ctx.strokeStyle='rgba(79,156,249,.18)';ctx.lineWidth=1;ctx.stroke();});
+  [R*.3,R*.65,R].forEach(r=>{ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);ctx.strokeStyle='rgba(79,156,249,.18)';ctx.lineWidth=1;ctx.stroke();});
   ctx.strokeStyle='rgba(79,156,249,.12)';ctx.lineWidth=1;
   ctx.beginPath();ctx.moveTo(cx-R,cy);ctx.lineTo(cx+R,cy);ctx.stroke();
   ctx.beginPath();ctx.moveTo(cx,cy-R);ctx.lineTo(cx,cy+R);ctx.stroke();
   const angle=(Date.now()/2200)%(Math.PI*2);
   ctx.save();ctx.translate(cx,cy);ctx.rotate(angle);
-  const g=ctx.createLinearGradient(0,-R,0,0);g.addColorStop(0,'rgba(79,156,249,0)');g.addColorStop(1,'rgba(79,156,249,.38)');
+  const g=ctx.createLinearGradient(0,-R,0,0);g.addColorStop(0,'rgba(79,156,249,0)');g.addColorStop(1,'rgba(79,156,249,.35)');
   ctx.beginPath();ctx.moveTo(0,0);ctx.arc(0,0,R,-Math.PI/2,-Math.PI/2+Math.PI*.38);ctx.fillStyle=g;ctx.fill();
   ctx.restore();
-  if(userPos){
-    memories.forEach(m=>{
-      const d=haversine(userPos.lat,userPos.lng,m.lat,m.lng);if(d>600)return;
-      const bearing=Math.atan2(m.lng-userPos.lng,m.lat-userPos.lat);
-      const scale=(d/600)*R*.92;
-      const bx=cx+Math.sin(bearing)*scale,by=cy-Math.cos(bearing)*scale;
-      const color=COLORS[m.cat]||'#4f9cf9';
-      ctx.beginPath();ctx.arc(bx,by,3.5,0,Math.PI*2);ctx.fillStyle=color;ctx.fill();
-    });
-  }
+  if(userPos)memories.forEach(m=>{
+    const d=haversine(userPos.lat,userPos.lng,m.lat,m.lng);if(d>600)return;
+    const bearing=Math.atan2(m.lng-userPos.lng,m.lat-userPos.lat);
+    const scale=(d/600)*R*.92;
+    const bx=cx+Math.sin(bearing)*scale,by=cy-Math.cos(bearing)*scale;
+    ctx.beginPath();ctx.arc(bx,by,3.5,0,Math.PI*2);ctx.fillStyle=COLORS[m.cat]||'#4f9cf9';ctx.fill();
+  });
   ctx.beginPath();ctx.arc(cx,cy,4,0,Math.PI*2);ctx.fillStyle='#4f9cf9';ctx.fill();
+}
+
+// ════════════════════════════════════════
+//  PROFILE
+// ════════════════════════════════════════
+function buildProfile(){
+  const {auth,signOut}=window._fb;
+  const mine=memories.filter(m=>m.authorId===currentUser?.id).length;
+  document.getElementById('profileBody').innerHTML=`
+    <div style="text-align:center;padding:14px 0 6px">
+      ${currentUser?.photo?`<img src="${currentUser.photo}" style="width:60px;height:60px;border-radius:50%;object-fit:cover;border:3px solid var(--accent);margin-bottom:10px" referrerpolicy="no-referrer">`:`<div style="width:60px;height:60px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--purple));display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:700;margin:0 auto 10px;color:#fff">${currentUser?.avatar||'?'}</div>`}
+      <div style="font-family:'Syne',sans-serif;font-size:17px;font-weight:700">${currentUser?.name||'Usuário'}</div>
+      <div style="font-size:11px;color:var(--text3);margin-top:3px">${currentUser?.anon?'Conta visitante (dados locais)':currentUser?.email||'Google Account'}</div>
+    </div>
+    <div style="background:var(--surface2);border-radius:11px;padding:11px 13px">
+      <div style="font-size:13px;color:var(--text2)">☁️ ${memories.length} memórias públicas no mapa</div>
+      <div style="font-size:13px;color:var(--text2);margin-top:4px">👤 ${mine} criadas por você</div>
+    </div>
+    ${currentUser?.anon?`<div style="background:rgba(251,191,36,.1);border:1px solid rgba(251,191,36,.3);border-radius:11px;padding:11px 13px;font-size:12px;color:var(--gold);line-height:1.6">⚠️ Você está como visitante. Faça login com Google para sincronizar entre dispositivos e não perder suas memórias.</div>`:''}
+    <button class="btn-s btn-danger" onclick="signOut(window._fb.auth).then(()=>location.reload())">🚪 Sair da conta</button>
+  `;
 }
 
 // ════════════════════════════════════════
@@ -1184,50 +1227,9 @@ function toggleTheme(){setTheme(isDark?'light':'dark');}
 function setTheme(t){
   isDark=t==='dark';
   document.documentElement.setAttribute('data-theme',t);
-  localStorage.setItem('gm3_theme',t);
+  localStorage.setItem('gm4_theme',t);
   document.querySelector('[onclick="toggleTheme()"]').textContent=isDark?'🌙':'☀️';
   document.getElementById('themeColorMeta').content=isDark?'#0a0f1e':'#f0f4ff';
-}
-
-// ════════════════════════════════════════
-//  PROFILE
-// ════════════════════════════════════════
-function buildProfile(){
-  document.getElementById('profileBody').innerHTML=`
-    <div style="text-align:center;padding:14px 0 6px">
-      <div style="width:60px;height:60px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--purple));display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:700;margin:0 auto 10px;color:#fff">${currentUser?.avatar||'?'}</div>
-      <div style="font-family:'Syne',sans-serif;font-size:17px;font-weight:700">${currentUser?.name||'Usuário'}</div>
-      <div style="font-size:11px;color:var(--text3);margin-top:2px">${currentUser?.type==='google'?'Google Account':'Visitante'}</div>
-    </div>
-    <div style="background:var(--surface2);border-radius:11px;padding:11px 13px;font-size:13px;color:var(--text2)">${memories.length} memórias · ${folders.length} pastas</div>
-    <button class="btn-s" onclick="exportData()">📤 Exportar backup (JSON)</button>
-    <label class="btn-s" for="importFile" style="cursor:pointer;justify-content:center">📥 Importar backup</label>
-    <input type="file" id="importFile" accept=".json" style="display:none" onchange="importData(this)">
-    <button class="btn-s btn-danger" onclick="logoutUser()">🚪 Sair</button>
-  `;
-}
-
-function logoutUser(){if(!confirm('Sair?'))return;localStorage.removeItem(UK);currentUser=null;closeAllSheets();document.getElementById('loginScreen').style.display='flex';}
-
-function exportData(){
-  const blob=new Blob([JSON.stringify({v:3,memories,folders,exported:new Date().toISOString()},null,2)],{type:'application/json'});
-  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='geomemory_v3_backup.json';a.click();showToast('📤 Exportado!');
-}
-
-function importData(input){
-  const file=input.files[0];if(!file)return;
-  const r=new FileReader();r.onload=e=>{
-    try{
-      const d=JSON.parse(e.target.result);
-      const mems=d.memories||d;
-      if(!Array.isArray(mems))throw new Error();
-      const existing=new Set(memories.map(m=>m.id));
-      const newM=mems.filter(m=>!existing.has(m.id));
-      memories.push(...newM);
-      if(d.folders){const ef=new Set(folders.map(f=>f.id));folders.push(...(d.folders||[]).filter(f=>!ef.has(f.id)));saveFolders();}
-      saveMemories();newM.forEach(m=>addMarker(m));showToast(`✅ ${newM.length} memórias importadas!`);closeAllSheets();
-    }catch{showToast('⚠️ Arquivo inválido');}
-  };r.readAsText(file);
 }
 
 // ════════════════════════════════════════
@@ -1236,20 +1238,9 @@ function importData(input){
 function checkURLParam(){
   const p=new URLSearchParams(location.search);
   const id=p.get('m'),lat=parseFloat(p.get('lat')),lng=parseFloat(p.get('lng'));
-  if(id&&!isNaN(lat)&&!isNaN(lng)){
-    setTimeout(()=>{if(map)map.setView([lat,lng],17);const m=memories.find(x=>x.id===id);if(m)setTimeout(()=>openDetail(id),1200);else showToast('📍 Memória não encontrada neste dispositivo');},1500);
-  }
+  if(id&&!isNaN(lat)){setTimeout(()=>{if(map)map.setView([lat,lng],17);setTimeout(()=>{const m=memories.find(x=>x.id===id);if(m)openDetail(id);else showToast('📍 Memória não encontrada');},2000);},1500);}
 }
-
-// ════════════════════════════════════════
-//  STORAGE
-// ════════════════════════════════════════
-function loadData(){
-  try{memories=JSON.parse(localStorage.getItem(SK)||'[]');}catch{memories=[];}
-  loadFolders();
-}
-function saveMemories(){localStorage.setItem(SK,JSON.stringify(memories));updateCounts();}
-function updateCounts(){document.getElementById('memCount').textContent=memories.length;document.getElementById('folderCount').textContent=folders.length;}
+window.addEventListener('firebase-ready',()=>setTimeout(checkURLParam,500));
 
 // ════════════════════════════════════════
 //  SHEETS
@@ -1261,14 +1252,11 @@ function openSheet(id){
   if(id==='listSheet')renderList();
   if(id==='statsSheet')buildStats();
   if(id==='profileSheet')buildProfile();
-  if(id==='foldersSheet')renderFolderList();
 }
 function closeAllSheets(keepOv){
   document.querySelectorAll('.sheet').forEach(s=>s.classList.remove('open'));
-  if(!keepOv){document.getElementById('overlay').classList.remove('show');currentDetailId=null;document.getElementById('distBar').classList.remove('show');}
+  if(!keepOv)document.getElementById('overlay').classList.remove('show');
 }
-
-// Swipe down
 document.querySelectorAll('.sheet').forEach(s=>{let sy=0;s.addEventListener('touchstart',e=>{sy=e.touches[0].clientY;},{passive:true});s.addEventListener('touchend',e=>{if(e.changedTouches[0].clientY-sy>90)closeAllSheets();},{passive:true});});
 
 // ════════════════════════════════════════
@@ -1276,10 +1264,7 @@ document.querySelectorAll('.sheet').forEach(s=>{let sy=0;s.addEventListener('tou
 // ════════════════════════════════════════
 function haversine(a,b,c,d){const R=6371000,dL=(c-a)*Math.PI/180,dl=(d-b)*Math.PI/180,x=Math.sin(dL/2)**2+Math.cos(a*Math.PI/180)*Math.cos(c*Math.PI/180)*Math.sin(dl/2)**2;return R*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x));}
 function setStatus(t,s){document.getElementById('statusTxt').textContent=t;document.getElementById('sdot').className='sdot'+(s==='on'?' on':s==='warn'?' warn':s==='err'?' err':'');}
-function showToast(msg,dur=2500){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),dur);}
-
-// Notify on first GPS
-const _origOnPos=onPos;
+function showToast(msg,dur=2800){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),dur);}
 </script>
 </body>
 </html>
