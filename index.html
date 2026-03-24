@@ -129,6 +129,8 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:'DM Sans',sans-seri
 .msBtn{width:38px;height:38px;border-radius:10px;background:var(--surface);border:1.5px solid var(--border2);display:flex;align-items:center;justify-content:center;font-size:17px;cursor:pointer;backdrop-filter:blur(10px);box-shadow:var(--sh);transition:transform .15s,border-color .15s;}
 .msBtn:active{transform:scale(.88);}
 .msBtn.active{border-color:var(--accent);background:var(--aglow);}
+.sat-opt{width:100%;padding:9px 12px;border-radius:9px;background:var(--surface2);border:1px solid var(--border2);color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer;text-align:left;transition:background .15s,border-color .15s;}
+.sat-opt:active,.sat-opt.active{background:var(--aglow);border-color:var(--accent);color:var(--accent);}
 
 /* FILTER PANEL */
 #mapFilterPanel{position:fixed;top:78px;right:58px;z-index:100;background:var(--surface);border:1px solid var(--border2);border-radius:14px;padding:12px 14px;display:none;flex-direction:column;gap:9px;backdrop-filter:blur(12px);box-shadow:var(--sh);min-width:190px;}
@@ -361,9 +363,8 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:'DM Sans',sans-seri
 <!-- MAP SWITCHER -->
 <div id="mapSwitcher">
   <div class="msBtn active" data-layer="streets" onclick="switchMap(this)" title="Ruas">🏙️</div>
-  <div class="msBtn" data-layer="satellite" onclick="switchMap(this)" title="Satélite Esri">🛰️</div>
-  <div class="msBtn" data-layer="sat2" onclick="switchMap(this)" title="Satélite Sentinel-2 (sem nuvens)">🌍</div>
-  <div class="msBtn" onclick="openGoogleMaps()" title="Abrir no Google Maps satélite">🔎</div>
+  <div class="msBtn" data-layer="satellite" onclick="switchMap(this)" title="Satélite Esri (recente)">🛰️</div>
+  <div class="msBtn" onclick="toggleSatPanel()" id="satPanelBtn" title="Satélite sem nuvens — várias datas">☁️</div>
   <div class="msBtn" data-layer="dark" onclick="switchMap(this)" title="Noturno">🌙</div>
   <div class="msBtn" data-layer="topo" onclick="switchMap(this)" title="Topográfico">🏔️</div>
   <div class="msBtn" onclick="toggleFilterPanel()" id="filterToggleBtn">🎛️</div>
@@ -379,6 +380,17 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:'DM Sans',sans-seri
   <div class="tog-row"><span>🌙 Filtro noite</span><button class="tog" id="togHue" onclick="toggleHue()"></button></div>
   <div class="tog-row"><span>📍 Marcadores</span><button class="tog on" id="togMarkers" onclick="toggleMarkers()"></button></div>
   <button onclick="resetMapFilter()" style="padding:8px;border-radius:9px;background:var(--surface2);border:1px solid var(--border2);color:var(--text2);font-size:12px;cursor:pointer;font-family:'DM Sans',sans-serif;">↺ Padrões</button>
+</div>
+
+<!-- SAT PANEL -->
+<div id="satPanel" style="position:fixed;top:78px;right:58px;z-index:100;background:var(--surface);border:1px solid var(--border2);border-radius:14px;padding:12px 14px;display:none;flex-direction:column;gap:7px;backdrop-filter:blur(12px);box-shadow:var(--sh);min-width:210px;">
+  <div style="font-family:'Syne',sans-serif;font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:1px;margin-bottom:2px">☁️ Satélite sem nuvens</div>
+  <div style="font-size:11px;color:var(--text3);line-height:1.5;margin-bottom:4px">Imagens processadas para remover nuvens — escolha o ano</div>
+  <button class="sat-opt" data-layer="sat2023" onclick="pickSat(this)">🌍 Sentinel-2 — 2023</button>
+  <button class="sat-opt" data-layer="sat2020" onclick="pickSat(this)">🌍 Sentinel-2 — 2020</button>
+  <button class="sat-opt" data-layer="sat2018" onclick="pickSat(this)">🌍 Sentinel-2 — 2018</button>
+  <button class="sat-opt" data-layer="satclarity" onclick="pickSat(this)">🔭 Esri Clarity (nítido)</button>
+  <div style="font-size:10px;color:var(--text3);margin-top:4px;line-height:1.5">Dica: se um ano tiver nuvem,<br>tente outro — são fotos diferentes</div>
 </div>
 
 <!-- RADAR -->
@@ -536,17 +548,26 @@ setTimeout(()=>{ if(!window._fb) { ldStatus('⚠️ Erro Firebase — verifique 
 const COLORS={'📸 Foto':'#4f9cf9','💬 Mensagem':'#34d399','⚠️ Alerta':'#f87171','🎨 Arte':'#a78bfa','🕐 Cápsula':'#fbbf24','❤️ Amor':'#f472b6','🚨 SOS':'#ff3b30'};
 const LAYERS={
   streets:   'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+  // Esri World Imagery — imagem mais recente disponível
   satellite: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-  sat2:      'https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2021_3857/default/GoogleMapsCompatible/{z}/{y}/{x}.jpg',
-  sat3:      'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+  // Sentinel-2 cloudless 2023 — processado sem nuvens (mais recente)
+  sat2023:   'https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2023_3857/default/GoogleMapsCompatible/{z}/{y}/{x}.jpg',
+  // Sentinel-2 cloudless 2020 — versão anterior, pode ter menos nuvens em certas regiões
+  sat2020:   'https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2020_3857/default/GoogleMapsCompatible/{z}/{y}/{x}.jpg',
+  // Sentinel-2 cloudless 2018
+  sat2018:   'https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2018_3857/default/GoogleMapsCompatible/{z}/{y}/{x}.jpg',
+  // Esri Clarity — versão mais nítida do Esri
+  satclarity:'https://clarity.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
   dark:      'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
   topo:      'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
 };
 const LAYER_ATTR={
   streets:   '© OpenStreetMap',
   satellite: '© Esri World Imagery',
-  sat2:      '© EOX IT Services — Sentinel-2 cloudless 2021',
-  sat3:      '© Esri World Imagery',
+  sat2023:   '© EOX/Sentinel-2 cloudless 2023',
+  sat2020:   '© EOX/Sentinel-2 cloudless 2020',
+  sat2018:   '© EOX/Sentinel-2 cloudless 2018',
+  satclarity:'© Esri Clarity',
   dark:      '© CARTO © OSM',
   topo:      '© OpenTopoMap',
 };
@@ -722,9 +743,12 @@ function switchMap(btn){
   currentLayer=layer;
   map.removeLayer(tileLayer);
   tileLayer=L.tileLayer(LAYERS[layer],{attribution:LAYER_ATTR[layer],maxZoom:19}).addTo(map);
-  if(layer==='satellite'||layer==='sat2'){
+  const isSatLayer=['satellite','sat2023','sat2020','sat2018','satclarity','sat2'].includes(layer);
+  if(isSatLayer){
     mapHue=false;
     if(document.getElementById('togHue'))document.getElementById('togHue').classList.remove('on');
+    // Close sat panel
+    const sp=document.getElementById('satPanel');if(sp)sp.style.display='none';
   }
   applyMapFilter();
   document.querySelectorAll('.msBtn').forEach(b=>b.classList.toggle('active',b.dataset.layer===layer&&!!b.dataset.layer));
@@ -741,6 +765,39 @@ function openGoogleMaps(){
   window.open(url, '_blank');
   showToast('🔎 Abrindo Google Maps satélite...');
 }
+
+function toggleSatPanel(){
+  const p=document.getElementById('satPanel');
+  p.style.display=p.style.display==='flex'?'none':'flex';
+  document.getElementById('mapFilterPanel').classList.remove('show');
+}
+
+function pickSat(btn){
+  const layer=btn.dataset.layer;
+  // Mark active
+  document.querySelectorAll('.sat-opt').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  // Switch map
+  if(map.hasLayer(tileLayer))map.removeLayer(tileLayer);
+  currentLayer=layer;
+  tileLayer=L.tileLayer(LAYERS[layer],{attribution:LAYER_ATTR[layer],maxZoom:19}).addTo(map);
+  // Remove filters for satellite
+  mapHue=false;
+  if(document.getElementById('togHue'))document.getElementById('togHue').classList.remove('on');
+  applyMapFilter();
+  // Mark msBtn
+  document.querySelectorAll('.msBtn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('satPanelBtn').classList.add('active');
+  const names={sat2023:'🌍 Sentinel-2 2023 (sem nuvens)',sat2020:'🌍 Sentinel-2 2020 (sem nuvens)',sat2018:'🌍 Sentinel-2 2018 (sem nuvens)',satclarity:'🔭 Esri Clarity'};
+  showToast(names[layer]||layer);
+}
+
+// Close sat panel on outside click
+document.addEventListener('click',e=>{
+  const p=document.getElementById('satPanel');
+  const b=document.getElementById('satPanelBtn');
+  if(p&&!p.contains(e.target)&&b&&!b.contains(e.target))p.style.display='none';
+});
 
 let mapFilterState={bright:100,sat:100,opac:100,contr:100};
 function applyMapFilter(){
