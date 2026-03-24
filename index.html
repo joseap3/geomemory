@@ -633,7 +633,7 @@ function subscribeMemories(){
   if(unsubscribe)unsubscribe();
 
   // Listen to PUBLIC memories
-  const pubQ=query(collection(db,'memories'),where('visibility','==','public'),orderBy('createdAt','desc'));
+  const pubQ=query(collection(db,'memories'),where('visibility','==','public'));
   const pubUnsub=onSnapshot(pubQ, snap=>{
     snap.docChanges().forEach(change=>{
       const data={id:change.doc.id,...change.doc.data()};
@@ -649,7 +649,15 @@ function subscribeMemories(){
     });
     updateCount(); renderList();
     setSynced();
-  },err=>{ showToast('⚠️ Erro sync: '+err.code); setSynced(); });
+  },err=>{
+    if(err.code==='failed-precondition'){
+      // Index not ready yet — retry without orderBy (already removed)
+      console.warn('Firestore index:', err.message);
+    } else {
+      showToast('⚠️ Erro sync: '+err.code);
+    }
+    setSynced();
+  });
 
   // Listen to MY PRIVATE memories
   let privUnsub=()=>{};
@@ -783,6 +791,7 @@ function centerOnMe(){if(userPos)map.flyTo([userPos.lat,userPos.lng],18,{duratio
 //  MARKERS
 // ════════════════════════════════════════
 function addMarker(m){
+  if(!map)return;
   const color=COLORS[m.cat]||'#4f9cf9', emoji=m.cat?.split(' ')[0]||'📍';
   const isPriv=m.visibility==='private';
   const isMine=m.authorId===currentUser?.id;
@@ -940,7 +949,9 @@ async function saveMemory(){
     }
 
     closeAllSheets();pendingLatLng=null;photoData=null;audioData=null;
-    if(ll)map.flyTo([ll.lat,ll.lng],17,{duration:1});
+    const flyLat=ll.lat??ll.latitude;
+    const flyLng=ll.lng??ll.longitude;
+    if(flyLat&&flyLng)map.flyTo([flyLat,flyLng],17,{duration:1});
   } catch(e){
     if(e.message&&e.message.includes('exceeds')){
       showToast('⚠️ Foto muito grande! Tente uma imagem menor.');
@@ -962,7 +973,12 @@ function openDetail(id){
   const isMine=m.authorId===currentUser?.id;
   document.getElementById('dtTitle').textContent=m.title;
   document.getElementById('dtText').textContent=m.text||'(sem texto)';
-  document.getElementById('dtDate').textContent=m.createdAt?.toDate?.()?.toLocaleString('pt-BR')||m.createdAt||'';
+  const dtRaw=m.createdAt;
+  let dtStr='';
+  if(dtRaw?.toDate) dtStr=dtRaw.toDate().toLocaleString('pt-BR');
+  else if(dtRaw?.seconds) dtStr=new Date(dtRaw.seconds*1000).toLocaleString('pt-BR');
+  else if(typeof dtRaw==='string') dtStr=dtRaw;
+  document.getElementById('dtDate').textContent=dtStr;
   document.getElementById('dtAuthor').textContent=(m.authorName||'Anônimo')+(isMine?' (você)':'');
   const img=document.getElementById('detailImg');
   const src=m.photoB64||m.photo;
@@ -1081,8 +1097,8 @@ function renderList(){
   if(listFilter==='starred')list=list.filter(m=>starred.has(m.id));
   if(q)list=list.filter(m=>m.title?.toLowerCase().includes(q)||(m.text||'').toLowerCase().includes(q)||m.cat?.toLowerCase().includes(q));
   list=[...list].sort((a,b)=>{
-    const ta=a.createdAt?.toDate?.()?.getTime()||new Date(a.createdAt||0).getTime();
-    const tb=b.createdAt?.toDate?.()?.getTime()||new Date(b.createdAt||0).getTime();
+    const ta=a.createdAt?.toDate?a.createdAt.toDate().getTime():a.createdAt?.seconds?a.createdAt.seconds*1000:0;
+    const tb=b.createdAt?.toDate?b.createdAt.toDate().getTime():b.createdAt?.seconds?b.createdAt.seconds*1000:0;
     return tb-ta;
   });
   const body=document.getElementById('listBody');
