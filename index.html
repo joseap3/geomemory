@@ -360,10 +360,12 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:'DM Sans',sans-seri
 
 <!-- MAP SWITCHER -->
 <div id="mapSwitcher">
-  <div class="msBtn active" data-layer="streets" onclick="switchMap(this)">🏙️</div>
-  <div class="msBtn" data-layer="satellite" onclick="switchMap(this)">🛰️</div>
-  <div class="msBtn" data-layer="dark" onclick="switchMap(this)">🌙</div>
-  <div class="msBtn" data-layer="topo" onclick="switchMap(this)">🏔️</div>
+  <div class="msBtn active" data-layer="streets" onclick="switchMap(this)" title="Ruas">🏙️</div>
+  <div class="msBtn" data-layer="satellite" onclick="switchMap(this)" title="Satélite Esri">🛰️</div>
+  <div class="msBtn" data-layer="sat2" onclick="switchMap(this)" title="Satélite Sentinel-2 (sem nuvens)">🌍</div>
+  <div class="msBtn" onclick="openGoogleMaps()" title="Abrir no Google Maps satélite">🔎</div>
+  <div class="msBtn" data-layer="dark" onclick="switchMap(this)" title="Noturno">🌙</div>
+  <div class="msBtn" data-layer="topo" onclick="switchMap(this)" title="Topográfico">🏔️</div>
   <div class="msBtn" onclick="toggleFilterPanel()" id="filterToggleBtn">🎛️</div>
 </div>
 
@@ -532,8 +534,22 @@ window.addEventListener('firebase-ready', initApp);
 setTimeout(()=>{ if(!window._fb) { ldStatus('⚠️ Erro Firebase — verifique as credenciais'); setTimeout(showOfflineMode,2000); } }, 6000);
 
 const COLORS={'📸 Foto':'#4f9cf9','💬 Mensagem':'#34d399','⚠️ Alerta':'#f87171','🎨 Arte':'#a78bfa','🕐 Cápsula':'#fbbf24','❤️ Amor':'#f472b6','🚨 SOS':'#ff3b30'};
-const LAYERS={streets:'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',satellite:'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',dark:'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',topo:'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png'};
-const LAYER_ATTR={streets:'© OpenStreetMap',satellite:'© Esri',dark:'© CARTO © OSM',topo:'© OpenTopoMap'};
+const LAYERS={
+  streets:   'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+  satellite: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+  sat2:      'https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2021_3857/default/GoogleMapsCompatible/{z}/{y}/{x}.jpg',
+  sat3:      'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+  dark:      'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+  topo:      'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
+};
+const LAYER_ATTR={
+  streets:   '© OpenStreetMap',
+  satellite: '© Esri World Imagery',
+  sat2:      '© EOX IT Services — Sentinel-2 cloudless 2021',
+  sat3:      '© Esri World Imagery',
+  dark:      '© CARTO © OSM',
+  topo:      '© OpenTopoMap',
+};
 const PROX=80, SK_LOCAL='gm4_local', SK_STAR='gm4_stars';
 
 let map, tileLayer, userMarker, accCircle;
@@ -706,10 +722,24 @@ function switchMap(btn){
   currentLayer=layer;
   map.removeLayer(tileLayer);
   tileLayer=L.tileLayer(LAYERS[layer],{attribution:LAYER_ATTR[layer],maxZoom:19}).addTo(map);
-  if(layer==='satellite'){mapHue=false;if(document.getElementById('togHue'))document.getElementById('togHue').classList.remove('on');}
+  if(layer==='satellite'||layer==='sat2'){
+    mapHue=false;
+    if(document.getElementById('togHue'))document.getElementById('togHue').classList.remove('on');
+  }
   applyMapFilter();
   document.querySelectorAll('.msBtn').forEach(b=>b.classList.toggle('active',b.dataset.layer===layer&&!!b.dataset.layer));
-  showToast({streets:'🏙️ Ruas',satellite:'🛰️ Satélite (sem filtro)',dark:'🌙 Noturno',topo:'🏔️ Topográfico'}[layer]);
+  showToast({streets:'🏙️ Mapa de ruas',satellite:'🛰️ Satélite Esri',sat2:'🌍 Sentinel-2 (sem nuvens 2021)',dark:'🌙 Noturno',topo:'🏔️ Topográfico'}[layer]||layer);
+}
+
+function openGoogleMaps(){
+  const center = map.getCenter();
+  const zoom = map.getZoom();
+  const lat = center.lat.toFixed(6);
+  const lng = center.lng.toFixed(6);
+  // Open Google Maps satellite at current map position
+  const url = `https://www.google.com/maps/@${lat},${lng},${zoom}z/data=!3m1!1e3`;
+  window.open(url, '_blank');
+  showToast('🔎 Abrindo Google Maps satélite...');
 }
 
 let mapFilterState={bright:100,sat:100,opac:100,contr:100};
